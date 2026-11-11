@@ -136,7 +136,10 @@
   }
   .ctl #clear { width: 46px; height: 46px; font-size: 20px; background: rgba(255,255,255,.22); box-shadow: none; }
 
-  footer #home { border: 0; width: 44px; height: 44px; border-radius: 50%; background: rgba(255,255,255,.2); font-size: 22px; flex: 0 0 auto; color: inherit; touch-action: manipulation; }
+  #top { display: flex; align-items: center; }
+  #top nav { flex: 1; min-width: 0; padding: 10px 10px 4px 8px; }
+  #top #home { margin: 6px 0 0 10px; }
+  #home { border: 0; width: 44px; height: 44px; border-radius: 50%; background: rgba(255,255,255,.2); font-size: 22px; flex: 0 0 auto; color: inherit; touch-action: manipulation; }
   /* ---------- volume ---------- */
   footer { display: flex; align-items: center; gap: 10px; padding: 4px 22px 12px; font-size: 20px; }
   input[type=range] { flex: 1; height: 28px; accent-color: #ffd23f; touch-action: manipulation; }
@@ -157,12 +160,15 @@
     border: 0; border-radius: 40px; padding: 22px 38px; font: inherit; font-size: 28px; font-weight: 900;
     color: #4a2a7a; background: #ffd23f; box-shadow: 0 8px 0 #c9971a; touch-action: manipulation;
   }
+  #homeS { position: absolute; top: calc(12px + env(safe-area-inset-top)); left: 12px; border: 0; width: 46px; height: 46px; border-radius: 50%; background: rgba(255,255,255,.2); font-size: 22px; color: inherit; touch-action: manipulation; }
   #start h1 { font-size: 44px; margin: 0 0 6px; }
   #start p { margin: 0 0 28px; font-size: 64px; }
 </style>
 </head>
 <body>
 <div id="app">
+  <div id="top">
+  <button id="home" aria-label="Menu">🏠</button>
   <nav>
     <button data-t="drums" class="on"><span>🥁</span>Drums</button>
     <button data-t="piano"><span>🎹</span>Piano</button>
@@ -174,6 +180,7 @@
     <button data-t="beats"><span>🎧</span>Beats</button>
     <button data-t="synth"><span>🪄</span>Magie</button>
   </nav>
+  </div>
   <main>
     <section id="drums" class="on"></section>
     <section id="piano"></section>
@@ -192,10 +199,10 @@
     </section>
     <section id="synth"><div id="hint">Sleep met je<br>vinger hier ✨</div></section>
   </main>
-  <footer><button id="home" aria-label="Naar het menu">🏠</button><span>🔈</span><input id="vol" type="range" min="0" max="100" value="60" aria-label="Volume"><span>🔊</span></footer>
+  <footer><span>🔈</span><input id="vol" type="range" min="0" max="100" value="60" aria-label="Volume"><span>🔊</span></footer>
 </div>
 <div id="fx"></div>
-<div id="start"><div><h1>Tiny Band</h1><p>🥁🎹🌈</p><button id="go">Laten we spelen!</button></div></div>
+<div id="start"><button id="homeS" aria-label="Menu">🏠</button><div><h1>Tiny Band</h1><p>🥁🎹🌈</p><button id="go">Laten we spelen!</button></div></div>
 
 <script>
 (() => {
@@ -559,6 +566,7 @@
   tabs.forEach((b) => b.addEventListener('click', () => { wake(); show(b.dataset.t); }));
 
   $('#home').addEventListener('click', () => { location.href = '../index.html'; });
+  $('#homeS').addEventListener('click', () => { location.href = '../index.html'; });
   $('#go').addEventListener('click', () => { wake(); $('#start').style.display = 'none'; piano(hz(0)); });
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) stopSeq();

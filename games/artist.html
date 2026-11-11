@@ -92,6 +92,8 @@
   .sheet, .sheet * { touch-action: pan-y; }
   .sheet h2 { margin: 2px 0 8px; font-size: 24px; display: flex; justify-content: space-between; align-items: center; }
   .sheet h3 { margin: 14px 0 8px; font-size: 14px; opacity: .8; text-transform: uppercase; letter-spacing: .08em; }
+  .sheet h2 span { flex: 1; text-align: center; }
+  #homeP { width: 44px; height: 44px; border-radius: 50%; background: rgba(255,255,255,.18); font-size: 20px; }
   #closeP { width: 44px; height: 44px; border-radius: 50%; background: rgba(255,255,255,.18); font-size: 20px; }
   .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
   .thumb { background: #fff; border-radius: 16px; padding: 0; overflow: hidden; position: relative; aspect-ratio: 1; box-shadow: 0 4px 0 rgba(0,0,0,.3); }
@@ -146,7 +148,7 @@
 
 <div id="picker" hidden>
   <div class="sheet">
-    <h2>Nieuwe tekening <button id="closeP" aria-label="Sluiten">✖️</button></h2>
+    <h2><button id="homeP" aria-label="Menu">🏠</button><span>Nieuwe tekening</span><button id="closeP" aria-label="Sluiten">✖️</button></h2>
     <h3>Leeg papier</h3>
     <div class="grid" id="blanks"></div>
     <h3>Kleurplaten</h3>
@@ -573,6 +575,7 @@
     b.addEventListener('click', () => start(p.id, '#ffffff')); $('#pages').appendChild(b);
   });
   $('#btnHome').addEventListener('click', () => { location.href = '../index.html'; });
+  $('#homeP').addEventListener('click', () => { location.href = '../index.html'; });
   $('#btnPages').addEventListener('click', () => { picker.hidden = false; });
   $('#closeP').addEventListener('click', () => { picker.hidden = true; });
 
