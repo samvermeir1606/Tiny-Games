@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<title>Bellen knallen</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#2b1f5c">
+<link rel="apple-touch-icon" href="../icon-180.png">
+<link rel="stylesheet" href="../shared.css">
+<style>
+  body { background: linear-gradient(180deg, #1b7fd6, #5fd0ff 70%, #b6f0ff) fixed; }
+  #cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  #count { position: absolute; top: 4px; left: 0; right: 0; text-align: center; font-size: 44px; font-weight: 900; text-shadow: 0 3px 6px rgba(0,0,0,.25); pointer-events: none; }
+</style>
+</head>
+<body>
+<div id="app"><div class="stage" id="stage"><canvas id="cv"></canvas><div id="count">🫧 0</div></div></div>
+<script src="../shared.js"></script>
+<script>
+(() => {
+  const A = Arcade, TAU = Math.PI * 2;
+  A.header('Bellen knallen');
+  const stage = document.getElementById('stage'), cv = document.getElementById('cv'), ctx = cv.getContext('2d'), countEl = document.getElementById('count');
+  let W, H, dpr, scale = 1;
+  function resize() {
+    const r = stage.getBoundingClientRect(); dpr = Math.min(devicePixelRatio || 1, 2); W = r.width; H = r.height;
+    cv.width = W * dpr; cv.height = H * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0); scale = Math.max(0.8, Math.min(1.5, Math.min(W, H) / 400));
+  }
+  resize(); addEventListener('resize', resize);
+
+  const INSIDE = ['⭐', '🐠', '🦄', '🐶', '🐱', '🌈', '🍓', '🎈', '🦋', '🐸', '🐢', '💎'];
+  let bubbles = [], parts = [], rings = [], reveals = [], popped = 0, running = false;
+  function spawn(y) {
+    const r = (28 + Math.random() * 38) * scale;
+    bubbles.push({ x0: r + Math.random() * (W - 2 * r), x: 0, y: y == null ? H + r : y, r, vy: -(45 + Math.random() * 70) * Math.max(0.7, H / 600), ph: Math.random() * TAU, amp: 6 + Math.random() * 14, hue: Math.random() * 360, e: Math.random() < 0.4 ? A.rand(INSIDE) : null });
+  }
+  function pop(b, i) {
+    bubbles.splice(i, 1);
+    for (let k = 0; k < 10; k++) { const a = Math.random() * TAU, s = 120 + Math.random() * 160; parts.push({ x: b.x, y: b.y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 1, h: b.hue, r: 3 + Math.random() * 4 }); }
+    rings.push({ x: b.x, y: b.y, r: b.r, life: 1, h: b.hue });
+    if (b.e) reveals.push({ x: b.x, y: b.y, e: b.e, life: 1, s: b.r * 1.4 });
+    popped++; countEl.textContent = '🫧 ' + popped; A.play('pop', b.r);
+    if (popped % 10 === 0) { A.confetti(24); A.play('match'); }
+  }
+  function hit(e) {
+    const r = cv.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+    for (let i = bubbles.length - 1; i >= 0; i--) { const b = bubbles[i]; if (Math.hypot(x - b.x, y - b.y) < b.r * 1.15) { pop(b, i); return; } }
+  }
+  cv.addEventListener('pointerdown', (e) => { e.preventDefault(); hit(e); });
+  cv.addEventListener('pointermove', (e) => { if (e.buttons) hit(e); });
+
+  let last = performance.now(), spawnT = 0;
+  function frame(t) {
+    const dt = Math.min(0.05, (t - last) / 1000); last = t;
+    if (running) { spawnT -= dt; if (spawnT <= 0 && bubbles.length < 24) { spawn(); spawnT = 0.3 + Math.random() * 0.4; } }
+    bubbles.forEach((b) => { b.y += b.vy * dt; b.ph += dt * 2; b.x = b.x0 + Math.sin(b.ph) * b.amp; });
+    bubbles = bubbles.filter((b) => b.y > -b.r * 1.5);
+    parts.forEach((p) => { p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 500 * dt; p.life -= dt * 1.8; }); parts = parts.filter((p) => p.life > 0);
+    rings.forEach((g) => { g.r += 160 * dt; g.life -= dt * 3; }); rings = rings.filter((g) => g.life > 0);
+    reveals.forEach((v) => { v.y -= 70 * dt; v.life -= dt * 0.9; }); reveals = reveals.filter((v) => v.life > 0);
+
+    ctx.clearRect(0, 0, W, H);
+    bubbles.forEach((b) => {
+      const g = ctx.createRadialGradient(b.x - b.r * 0.3, b.y - b.r * 0.35, b.r * 0.1, b.x, b.y, b.r);
+      g.addColorStop(0, `hsla(${b.hue},90%,85%,.35)`); g.addColorStop(1, `hsla(${b.hue},90%,60%,.6)`);
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, TAU); ctx.fill();
+      ctx.strokeStyle = `hsla(${b.hue},90%,85%,.95)`; ctx.lineWidth = 3; ctx.stroke();
+      ctx.fillStyle = 'rgba(255,255,255,.75)'; ctx.beginPath(); ctx.ellipse(b.x - b.r * 0.38, b.y - b.r * 0.42, b.r * 0.2, b.r * 0.12, -0.7, 0, TAU); ctx.fill();
+      if (b.e) { ctx.font = `${b.r * 0.95}px "Apple Color Emoji","Segoe UI Emoji",sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(b.e, b.x, b.y + b.r * 0.05); }
+    });
+    rings.forEach((g) => { ctx.strokeStyle = `hsla(${g.h},90%,90%,${g.life})`; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(g.x, g.y, g.r, 0, TAU); ctx.stroke(); });
+    parts.forEach((p) => { ctx.fillStyle = `hsla(${p.h},90%,80%,${p.life})`; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, TAU); ctx.fill(); });
+    reveals.forEach((v) => { ctx.globalAlpha = Math.max(0, v.life); ctx.font = `${v.s}px "Apple Color Emoji","Segoe UI Emoji",sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(v.e, v.x, v.y); ctx.globalAlpha = 1; });
+    requestAnimationFrame(frame);
+  }
+  for (let i = 0; i < 8; i++) spawn(H * (0.2 + Math.random() * 0.7));
+  requestAnimationFrame(frame);
+  A.start({ emoji: '🫧', title: 'Bellen knallen', hint: 'Tik of veeg om de bellen kapot te maken!' }, () => { running = true; });
+})();
+</script>
+</body>
+</html>

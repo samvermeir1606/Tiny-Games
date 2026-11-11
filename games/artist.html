@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<title>Tiny Artist</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Tiny Artist">
+<meta name="theme-color" content="#2b1f5c">
+<link rel="apple-touch-icon" href="../icon-180.png">
+<link rel="icon" href="../icon-192.png">
+<style>
+  :root { --bg1:#2b1f5c; --bg2:#7a2f9a; }
+  * {
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none;
+    -webkit-user-select: none; user-select: none; touch-action: none;
+  }
+  html, body {
+    margin: 0; height: 100%; overflow: hidden; overscroll-behavior: none;
+    background: linear-gradient(160deg, var(--bg1), var(--bg2)) fixed;
+    font-family: ui-rounded, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: #fff;
+  }
+  #app {
+    position: fixed; inset: 0; display: flex; flex-direction: column;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+  button { font: inherit; color: inherit; border: 0; touch-action: manipulation; }
+
+  /* ---------- header ---------- */
+  header { display: flex; gap: 8px; padding: 10px 10px 6px; align-items: center; }
+  header .sp { flex: 1; }
+  header button {
+    display: flex; flex-direction: column; align-items: center; gap: 1px; min-width: 56px;
+    padding: 6px 5px 5px; border-radius: 16px; background: rgba(255,255,255,.16); font-size: 11px; font-weight: 800;
+  }
+  header button span { font-size: 24px; line-height: 1.1; }
+  header button:active { background: rgba(255,255,255,.32); }
+  header button.off { opacity: .35; }
+  #btnPages { background: #ffd23f; color: #4a2a7a; box-shadow: 0 3px 0 #c9971a; }
+
+  /* ---------- canvas ---------- */
+  #stage { flex: 1; min-height: 0; position: relative; display: grid; place-items: center; padding: 0 8px; }
+  #board { position: relative; border-radius: 14px; overflow: hidden; box-shadow: 0 6px 24px rgba(0,0,0,.45); }
+  #board canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  #lines { pointer-events: none; }
+  #stamps {
+    position: absolute; left: 10px; right: 10px; bottom: 6px; display: flex; gap: 6px; padding: 6px;
+    background: rgba(20,12,50,.8); border-radius: 22px; overflow-x: auto; scrollbar-width: none;
+  }
+  #stamps[hidden], #picker[hidden] { display: none; }
+  #stamps::-webkit-scrollbar { display: none; }
+  #stamps, #stamps * { touch-action: pan-x; }
+  #stamps button { flex: 0 0 auto; font-size: 30px; width: 50px; height: 50px; border-radius: 14px; background: rgba(255,255,255,.12); }
+  #stamps button.on { background: #fff; }
+
+  /* ---------- tools ---------- */
+  .scroller { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; scroll-snap-type: x proximity; }
+  .scroller::-webkit-scrollbar { display: none; }
+  .scroller, .scroller * { touch-action: pan-x; }
+  #tools { padding: 8px 10px 4px; }
+  #tools button {
+    flex: 0 0 66px; border-radius: 16px; padding: 6px 2px 5px; background: rgba(255,255,255,.14);
+    display: flex; flex-direction: column; align-items: center; gap: 1px; font-size: 11px; font-weight: 800; scroll-snap-align: center;
+  }
+  #tools button span { font-size: 26px; line-height: 1.1; }
+  #tools button.on { background: #fff; color: #4a2a7a; box-shadow: 0 4px 0 rgba(0,0,0,.25); }
+
+  #row2 { display: flex; align-items: center; gap: 10px; padding: 4px 10px 12px; }
+  #sizes { display: flex; gap: 6px; flex: 0 0 auto; }
+  #sizes button { width: 44px; height: 44px; border-radius: 50%; background: rgba(255,255,255,.14); display: grid; place-items: center; }
+  #sizes button i { display: block; border-radius: 50%; background: #fff; }
+  #sizes button.on { background: #fff; }
+  #sizes button.on i { background: #4a2a7a; }
+  #colors { flex: 1; min-width: 0; padding: 6px 4px; }
+  .sw {
+    flex: 0 0 40px; height: 40px; border-radius: 50%; background: var(--c); border: 3px solid rgba(255,255,255,.55);
+    box-shadow: 0 2px 0 rgba(0,0,0,.25); display: grid; place-items: center; font-size: 20px; position: relative;
+  }
+  .sw.on { transform: scale(1.22); border-color: #fff; box-shadow: 0 0 0 3px rgba(255,255,255,.35), 0 3px 0 rgba(0,0,0,.3); }
+  .sw.custom { background: conic-gradient(red, yellow, lime, cyan, blue, magenta, red); }
+  .sw.custom input { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; }
+
+  /* ---------- picker ---------- */
+  #picker { position: fixed; inset: 0; z-index: 30; background: rgba(15,8,40,.78); display: grid; place-items: center; padding: env(safe-area-inset-top) 12px env(safe-area-inset-bottom); }
+  .sheet {
+    width: min(100%, 560px); max-height: 92%; overflow-y: auto; background: #3a2a72; border-radius: 26px; padding: 14px 14px 18px;
+    box-shadow: 0 10px 40px rgba(0,0,0,.5);
+  }
+  .sheet, .sheet * { touch-action: pan-y; }
+  .sheet h2 { margin: 2px 0 8px; font-size: 24px; display: flex; justify-content: space-between; align-items: center; }
+  .sheet h3 { margin: 14px 0 8px; font-size: 14px; opacity: .8; text-transform: uppercase; letter-spacing: .08em; }
+  #closeP { width: 44px; height: 44px; border-radius: 50%; background: rgba(255,255,255,.18); font-size: 20px; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .thumb { background: #fff; border-radius: 16px; padding: 0; overflow: hidden; position: relative; aspect-ratio: 1; box-shadow: 0 4px 0 rgba(0,0,0,.3); }
+  .thumb canvas { width: 100%; height: 100%; display: block; }
+  .thumb b { position: absolute; left: 0; right: 0; bottom: 5px; text-align: center; font-size: 12px; color: #4a2a7a; }
+  .thumb.blank b { color: #333; }
+  .thumb:active { transform: scale(.96); }
+
+  #toast {
+    position: fixed; left: 50%; bottom: 120px; transform: translateX(-50%); z-index: 40; background: #fff; color: #4a2a7a;
+    font-weight: 800; padding: 12px 20px; border-radius: 24px; opacity: 0; transition: opacity .25s; pointer-events: none;
+  }
+  #toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <button id="btnHome"><span>🏠</span>Menu</button>
+    <button id="btnPages"><span>🖼️</span>Nieuw</button>
+    <div class="sp"></div>
+    <button id="btnUndo" class="off"><span>↩️</span>Terug</button>
+    <button id="btnClear"><span>🗑️</span>Wissen</button>
+    <button id="btnSave"><span>💾</span>Bewaar</button>
+  </header>
+
+  <div id="stage">
+    <div id="board"><canvas id="paint"></canvas><canvas id="lines"></canvas></div>
+    <div id="stamps" hidden></div>
+  </div>
+
+  <div id="tools" class="scroller">
+    <button data-tool="crayon" class="on"><span>🖍️</span>Krijt</button>
+    <button data-tool="marker"><span>🖌️</span>Stift</button>
+    <button data-tool="rainbow"><span>🌈</span>Regenboog</button>
+    <button data-tool="glow"><span>✨</span>Gloed</button>
+    <button data-tool="spray"><span>💨</span>Spuit</button>
+    <button data-tool="fill"><span>🪣</span>Vullen</button>
+    <button data-tool="stamp"><span>🦄</span>Stempels</button>
+    <button data-tool="eraser"><span>🧽</span>Gum</button>
+  </div>
+
+  <div id="row2">
+    <div id="sizes">
+      <button data-s="0" aria-label="Klein"><i style="width:8px;height:8px"></i></button>
+      <button data-s="1" class="on" aria-label="Middel"><i style="width:16px;height:16px"></i></button>
+      <button data-s="2" aria-label="Groot"><i style="width:28px;height:28px"></i></button>
+    </div>
+    <div id="colors" class="scroller"></div>
+  </div>
+</div>
+
+<div id="picker" hidden>
+  <div class="sheet">
+    <h2>Nieuwe tekening <button id="closeP" aria-label="Sluiten">✖️</button></h2>
+    <h3>Leeg papier</h3>
+    <div class="grid" id="blanks"></div>
+    <h3>Kleurplaten</h3>
+    <div class="grid" id="pages"></div>
+  </div>
+</div>
+<div id="toast"></div>
+
+<script>
+(() => {
+  const $ = (s) => document.querySelector(s);
+  const TAU = Math.PI * 2;
+
+  /* =====================================================================
+     Coloring pages: drawn with code on a 1000 x 1000 grid.
+     Every shape is closed, so the paint bucket fills it neatly.
+     ===================================================================== */
+  function T(c) {
+    const sh = (f, solid = true) => { // draw a shape; "solid" hides lines behind it
+      c.beginPath(); f();
+      if (solid) { c.save(); c.globalCompositeOperation = 'destination-out'; c.fill(); c.restore(); }
+      c.stroke();
+    };
+    const open = (f) => { c.beginPath(); f(); c.stroke(); };
+    const clipTo = (shape, g) => { c.save(); c.beginPath(); shape(); c.clip(); g(); c.restore(); };
+    const circ = (x, y, r, solid = true) => sh(() => c.arc(x, y, r, 0, TAU), solid);
+    const ell = (x, y, rx, ry, rot = 0, solid = true) => sh(() => c.ellipse(x, y, rx, ry, rot, 0, TAU), solid);
+    const poly = (pts, solid = true) => sh(() => { pts.forEach(([x, y], i) => (i ? c.lineTo(x, y) : c.moveTo(x, y))); c.closePath(); }, solid);
+    const line = (x1, y1, x2, y2) => open(() => { c.moveTo(x1, y1); c.lineTo(x2, y2); });
+    const star = (x, y, R) => poly(Array.from({ length: 10 }, (_, i) => {
+      const a = -Math.PI / 2 + i * Math.PI / 5, r = i % 2 ? R * 0.45 : R; return [x + Math.cos(a) * r, y + Math.sin(a) * r];
+    }));
+    const cloud = (x, y, s) => {
+      const lw = c.lineWidth; c.save(); c.translate(x, y); c.scale(s, s); c.lineWidth = lw / s;
+      sh(() => {
+        c.moveTo(-100, 40); c.bezierCurveTo(-150, 40, -150, -30, -90, -30);
+        c.bezierCurveTo(-90, -90, 0, -100, 10, -50); c.bezierCurveTo(40, -100, 120, -80, 110, -20);
+        c.bezierCurveTo(160, -10, 160, 40, 110, 40); c.closePath();
+      });
+      c.restore();
+    };
+    const sun = (x, y, r) => {
+      for (let i = 0; i < 12; i++) { const a = i * TAU / 12; line(x + Math.cos(a) * (r + 25), y + Math.sin(a) * (r + 25), x + Math.cos(a) * (r + 60), y + Math.sin(a) * (r + 60)); }
+      circ(x, y, r);
+    };
+    return { c, sh, open, clipTo, circ, ell, poly, line, star, cloud, sun };
+  }
+  const mir = (pts) => pts.map(([x, y]) => [1000 - x, y]);
+
+  const ART = {
+    fish(t) {
+      const { c, sh, open, clipTo, circ } = t;
+      [[170, 300, 34], [110, 220, 22], [190, 170, 16]].forEach(([x, y, r]) => circ(x, y, r));
+      sh(() => { c.moveTo(690, 500); c.lineTo(900, 330); c.quadraticCurveTo(840, 500, 900, 670); c.closePath(); });
+      sh(() => { c.moveTo(380, 330); c.quadraticCurveTo(430, 200, 560, 230); c.quadraticCurveTo(530, 290, 540, 325); c.closePath(); });
+      sh(() => { c.moveTo(430, 670); c.quadraticCurveTo(450, 780, 560, 790); c.quadraticCurveTo(540, 730, 550, 672); c.closePath(); });
+      const body = () => c.ellipse(450, 500, 290, 190, 0, 0, TAU);
+      sh(body);
+      clipTo(body, () => {
+        open(() => { c.moveTo(400, 300); c.quadraticCurveTo(470, 500, 400, 700); });
+        open(() => { c.moveTo(540, 300); c.quadraticCurveTo(610, 500, 540, 700); });
+      });
+      circ(300, 455, 32); circ(296, 455, 12, false);
+      open(() => { c.moveTo(185, 525); c.quadraticCurveTo(215, 555, 255, 540); });
+      // seaweed + pebbles
+      sh(() => { c.moveTo(760, 900); c.quadraticCurveTo(700, 820, 760, 760); c.quadraticCurveTo(830, 700, 780, 640); c.quadraticCurveTo(860, 720, 810, 780); c.quadraticCurveTo(760, 830, 800, 900); c.closePath(); });
+      t.ell(300, 920, 80, 35); t.ell(450, 935, 55, 25);
+    },
+    butterfly(t) {
+      const { c, sh, open, clipTo, circ, ell } = t;
+      ell(365, 640, 150, 105, -0.45); ell(635, 640, 150, 105, 0.45);
+      ell(330, 385, 215, 135, 0.5); ell(670, 385, 215, 135, -0.5);
+      [[300, 380, 62], [700, 380, 62], [345, 645, 44], [655, 645, 44]].forEach(([x, y, r]) => { circ(x, y, r, false); circ(x, y, r * 0.4, false); });
+      const body = () => c.ellipse(500, 520, 30, 175, 0, 0, TAU);
+      sh(body);
+      clipTo(body, () => [440, 500, 560, 620].forEach((y) => t.line(460, y, 540, y)));
+      circ(500, 330, 40);
+      open(() => { c.moveTo(485, 298); c.quadraticCurveTo(450, 230, 410, 215); });
+      open(() => { c.moveTo(515, 298); c.quadraticCurveTo(550, 230, 590, 215); });
+      circ(405, 212, 14); circ(595, 212, 14);
+      t.star(130, 130, 40); t.star(880, 150, 34); t.star(860, 880, 36); t.star(120, 880, 30);
+    },
+    house(t) {
+      const { c, sh, open, circ, line, poly } = t;
+      t.sun(150, 160, 65); t.cloud(790, 170, 1);
+      sh(() => c.rect(620, 290, 70, 140));
+      sh(() => c.rect(260, 480, 480, 340));
+      sh(() => { c.moveTo(210, 490); c.lineTo(500, 250); c.lineTo(790, 490); c.closePath(); });
+      circ(500, 400, 38); line(462, 400, 538, 400); line(500, 362, 500, 438);
+      sh(() => c.rect(440, 640, 120, 180)); circ(535, 735, 9, false);
+      [[310, 560], [590, 560]].forEach(([x, y]) => { sh(() => c.rect(x, y, 100, 100)); line(x + 50, y, x + 50, y + 100); line(x, y + 50, x + 100, y + 50); });
+      poly([[440, 820], [340, 960], [660, 960], [560, 820]]);
+      line(60, 820, 940, 820);
+      [[120, 790], [880, 790]].forEach(([x, y]) => { circ(x, y, 22); line(x, y + 22, x, y + 30); });
+    },
+    flower(t) {
+      const { c, sh, open, circ, ell } = t;
+      t.sun(140, 140, 55); t.cloud(820, 150, 0.9);
+      sh(() => c.rect(480, 440, 40, 450));
+      sh(() => { c.moveTo(480, 730); c.quadraticCurveTo(380, 620, 300, 650); c.quadraticCurveTo(360, 760, 480, 780); c.closePath(); });
+      sh(() => { c.moveTo(520, 660); c.quadraticCurveTo(620, 550, 700, 580); c.quadraticCurveTo(640, 690, 520, 710); c.closePath(); });
+      for (let k = 0; k < 8; k++) { const a = k * TAU / 8; ell(500 + Math.cos(a) * 135, 380 + Math.sin(a) * 135, 72, 54, a); }
+      circ(500, 380, 78); circ(500, 380, 34, false);
+      open(() => { c.moveTo(60, 890); c.quadraticCurveTo(200, 850, 330, 890); c.quadraticCurveTo(460, 930, 600, 890); c.quadraticCurveTo(760, 850, 940, 890); });
+      [[200, 870], [800, 870]].forEach(([x, y]) => { circ(x, y - 40, 20); t.line(x, y - 20, x, y + 10); });
+    },
+    rocket(t) {
+      const { c, sh, open, clipTo, circ, poly } = t;
+      t.star(140, 200, 40); t.star(870, 400, 34); t.star(150, 760, 30); t.star(880, 880, 36);
+      circ(820, 150, 65); t.ell(820, 150, 115, 28, -0.3, false);
+      poly([[335, 470], [215, 650], [215, 770], [345, 660]]);
+      poly(mir([[335, 470], [215, 650], [215, 770], [345, 660]]));
+      poly([[400, 660], [600, 660], [575, 735], [425, 735]]);
+      sh(() => { c.moveTo(430, 735); c.quadraticCurveTo(500, 980, 570, 735); c.closePath(); });
+      sh(() => { c.moveTo(465, 740); c.quadraticCurveTo(500, 870, 535, 740); c.closePath(); }, false);
+      const body = () => { c.moveTo(500, 130); c.bezierCurveTo(660, 240, 700, 470, 660, 660); c.lineTo(340, 660); c.bezierCurveTo(300, 470, 340, 240, 500, 130); c.closePath(); };
+      sh(body);
+      clipTo(body, () => {
+        open(() => { c.moveTo(280, 540); c.quadraticCurveTo(500, 590, 720, 540); });
+        open(() => { c.moveTo(280, 600); c.quadraticCurveTo(500, 650, 720, 600); });
+      });
+      circ(500, 360, 78); circ(500, 360, 50, false);
+    },
+    cat(t) {
+      const { c, sh, open, clipTo, circ, ell, poly, line } = t;
+      const ear = [[230, 430], [250, 170], [460, 300]], inner = [[270, 390], [280, 255], [385, 315]];
+      poly(ear); poly(mir(ear)); poly(inner, false); poly(mir(inner), false);
+      const head = () => c.ellipse(500, 540, 300, 250, 0, 0, TAU);
+      sh(head);
+      clipTo(head, () => { line(500, 300, 500, 365); line(440, 310, 450, 360); line(560, 310, 550, 360); });
+      ell(390, 520, 48, 62); ell(396, 528, 20, 40, 0, false); circ(404, 505, 8, false);
+      ell(610, 520, 48, 62); ell(604, 528, 20, 40, 0, false); circ(596, 505, 8, false);
+      poly([[465, 590], [535, 590], [500, 632]]);
+      open(() => c.arc(468, 632, 32, 0, Math.PI * 0.95));
+      open(() => c.arc(532, 632, 32, Math.PI * 0.05, Math.PI));
+      [[345, 612, 160, 575], [340, 645, 150, 650], [345, 676, 180, 725]].forEach(([a, b, x, y]) => { line(a, b, x, y); line(1000 - a, b, 1000 - x, y); });
+      const ball = () => c.arc(810, 845, 95, 0, TAU);
+      sh(ball);
+      clipTo(ball, () => {
+        open(() => { c.moveTo(720, 790); c.quadraticCurveTo(810, 850, 900, 780); });
+        open(() => { c.moveTo(715, 850); c.quadraticCurveTo(810, 910, 905, 850); });
+        open(() => { c.moveTo(760, 760); c.quadraticCurveTo(840, 850, 770, 935); });
+      });
+      open(() => { c.moveTo(735, 910); c.quadraticCurveTo(640, 960, 560, 900); c.quadraticCurveTo(500, 870, 440, 920); });
+      t.star(120, 880, 36);
+    },
+    rainbow(t) {
+      const { c, sh, open, circ, line } = t;
+      t.sun(500, 150, 62);
+      [350, 300, 250, 200, 150].forEach((r) => sh(() => c.arc(500, 700, r, Math.PI, TAU), true));
+      line(150, 700, 850, 700);
+      t.cloud(170, 715, 1.05); t.cloud(830, 715, 1.05);
+      t.star(130, 330, 36); t.star(870, 330, 36); t.star(300, 880, 32); t.star(700, 880, 32);
+      circ(500, 850, 38); t.line(500, 888, 500, 940);
+    },
+    car(t) {
+      const { c, sh, open, circ, poly, line } = t;
+      t.sun(150, 150, 55); t.cloud(790, 170, 0.9);
+      circ(95, 545, 18); circ(55, 505, 12);
+      sh(() => {
+        c.moveTo(150, 600); c.lineTo(150, 505); c.quadraticCurveTo(150, 470, 190, 462); c.lineTo(330, 440); c.lineTo(420, 340);
+        c.quadraticCurveTo(440, 320, 470, 320); c.lineTo(640, 320); c.quadraticCurveTo(670, 320, 690, 345); c.lineTo(760, 440);
+        c.lineTo(820, 460); c.quadraticCurveTo(850, 470, 850, 505); c.lineTo(850, 600); c.closePath();
+      });
+      poly([[360, 440], [435, 355], [535, 355], [535, 440]], false);
+      poly([[565, 440], [565, 355], [650, 355], [715, 440]], false);
+      line(550, 440, 550, 590); circ(820, 525, 22); poly([[155, 520], [180, 520], [180, 550], [155, 550]], false);
+      line(580, 480, 640, 480);
+      [[300, 620], [700, 620]].forEach(([x, y]) => { circ(x, y, 85); circ(x, y, 45, false); circ(x, y, 14, false); });
+      line(40, 705, 960, 705);
+      [[130, 770, 320, 770], [420, 770, 600, 770], [700, 770, 880, 770]].forEach(([a, b, x, y]) => line(a, b, x, y));
+    },
+    icecream(t) {
+      const { c, sh, open, clipTo, circ, ell, line } = t;
+      t.star(160, 250, 36); t.star(840, 310, 30); t.star(790, 760, 28); t.star(200, 780, 26);
+      const cone = () => { c.moveTo(370, 520); c.lineTo(630, 520); c.lineTo(500, 920); c.closePath(); };
+      sh(cone);
+      clipTo(cone, () => {
+        for (let i = 0; i < 9; i++) { const x0 = 300 + i * 45; line(x0, 500, x0 - 220, 940); line(x0, 500, x0 + 220, 940); }
+      });
+      ell(500, 505, 175, 80);
+      const top = () => c.ellipse(500, 370, 140, 110, 0, 0, TAU);
+      sh(top);
+      clipTo(top, () => [[440, 330, .5], [520, 305, 2], [565, 385, 1.2], [455, 410, 2.6], [500, 360, 3.2], [405, 375, 1], [575, 330, 2.2], [530, 430, .2]]
+        .forEach(([x, y, a]) => line(x - Math.cos(a) * 12, y - Math.sin(a) * 12, x + Math.cos(a) * 12, y + Math.sin(a) * 12)));
+      circ(500, 245, 38);
+      open(() => { c.moveTo(505, 208); c.quadraticCurveTo(545, 130, 600, 105); });
+    },
+  };
+  const PAGES = [
+    { id: 'fish', n: 'Vis' }, { id: 'butterfly', n: 'Vlinder' }, { id: 'house', n: 'Huis' },
+    { id: 'flower', n: 'Bloem' }, { id: 'rocket', n: 'Raket' }, { id: 'cat', n: 'Kat' },
+    { id: 'rainbow', n: 'Regenboog' }, { id: 'car', n: 'Auto' }, { id: 'icecream', n: 'IJsje' },
+  ];
+  function renderPage(c, w, h, id, lw = 11) {
+    c.save();
+    const s = Math.min(w, h) / 1000 * 0.96;
+    c.translate((w - 1000 * s) / 2, (h - 1000 * s) / 2); c.scale(s, s);
+    c.lineWidth = lw; c.lineCap = 'round'; c.lineJoin = 'round'; c.strokeStyle = '#222'; c.fillStyle = '#000';
+    ART[id](T(c));
+    c.restore();
+  }
+
+  /* ============================ canvas setup ============================ */
+  const stage = $('#stage'), board = $('#board'), paint = $('#paint'), lines = $('#lines');
+  const pctx = paint.getContext('2d');
+  const lctx = lines.getContext('2d', { willReadFrequently: true });
+  let W, H, page = null, bg = '#ffffff', dirty = false;
+  let tool = 'crayon', color = '#ff3b3b', size = 1, stampCh = '🦄';
+  const undoStack = [];
+
+  (function initSize() {
+    const r = stage.getBoundingClientRect(), dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const k = Math.min(1, 1500 / Math.max(r.width * dpr, r.height * dpr));
+    W = Math.max(300, Math.round(r.width * dpr * k)); H = Math.max(300, Math.round(r.height * dpr * k));
+    paint.width = lines.width = W; paint.height = lines.height = H;
+  })();
+  function fit() {
+    const r = stage.getBoundingClientRect(), s = Math.min((r.width - 16) / W, r.height / H);
+    board.style.width = W * s + 'px'; board.style.height = H * s + 'px';
+  }
+  fit(); addEventListener('resize', fit); addEventListener('orientationchange', () => setTimeout(fit, 200));
+
+  const k = () => W / 800;
+  function updateUndo() { $('#btnUndo').classList.toggle('off', !undoStack.length); }
+  function setPage(id, bgc) {
+    page = id; bg = bgc; dirty = false; undoStack.length = 0; updateUndo();
+    pctx.fillStyle = bg; pctx.fillRect(0, 0, W, H);
+    lctx.clearRect(0, 0, W, H);
+    if (id) renderPage(lctx, W, H, id);
+  }
+  function pushUndo() {
+    undoStack.push(pctx.getImageData(0, 0, W, H));
+    if (undoStack.length > 10) undoStack.shift();
+    updateUndo(); dirty = true;
+  }
+
+  /* ============================ autosave ============================ */
+  let saveTimer;
+  function saveSoon() { clearTimeout(saveTimer); saveTimer = setTimeout(autosave, 600); }
+  function autosave() {
+    try { localStorage.setItem('ta-save', JSON.stringify({ page, bg, W, H, img: paint.toDataURL('image/png') })); } catch (e) {}
+  }
+  function restore() {
+    try {
+      const d = JSON.parse(localStorage.getItem('ta-save') || 'null'); if (!d) return false;
+      setPage(d.page, d.bg);
+      const img = new Image();
+      img.onload = () => { const s = Math.min(W / d.W, H / d.H); pctx.drawImage(img, (W - d.W * s) / 2, (H - d.H * s) / 2, d.W * s, d.H * s); };
+      img.src = d.img; dirty = true; return true;
+    } catch (e) { return false; }
+  }
+
+  /* ============================ drawing ============================ */
+  const BASE = [7, 16, 34], STAMP = [70, 120, 200];
+  const bw = () => BASE[size] * k();
+  function stroke(a, b, w, style) {
+    pctx.strokeStyle = style; pctx.lineWidth = w; pctx.lineCap = 'round'; pctx.lineJoin = 'round';
+    pctx.beginPath(); pctx.moveTo(a.x, a.y); pctx.lineTo(b.x, b.y); pctx.stroke();
+  }
+  function seg(st, a, b) {
+    const c = pctx, d = Math.hypot(b.x - a.x, b.y - a.y);
+    switch (tool) {
+      case 'crayon': stroke(a, b, bw(), color); break;
+      case 'marker': stroke(a, b, bw() * 1.9, color); break;
+      case 'eraser': stroke(a, b, bw() * 2.4, bg); break;
+      case 'rainbow': st.hue = (st.hue + d * 0.5) % 360; stroke(a, b, bw() * 1.3, `hsl(${st.hue},95%,55%)`); break;
+      case 'glow':
+        c.save(); c.shadowColor = color; c.shadowBlur = bw() * 1.8;
+        stroke(a, b, bw(), color); c.restore(); break;
+      case 'spray': {
+        const n = Math.max(1, Math.ceil(d / (bw() * 0.4))); c.fillStyle = color;
+        for (let i = 0; i < n; i++) {
+          const t = i / n, x = a.x + (b.x - a.x) * t, y = a.y + (b.y - a.y) * t;
+          for (let j = 0; j < 8; j++) { const an = Math.random() * TAU, r = bw() * 1.8 * Math.sqrt(Math.random()); c.fillRect(x + Math.cos(an) * r, y + Math.sin(an) * r, 2 * k(), 2 * k()); }
+        }
+        break;
+      }
+    }
+  }
+  function stampAt(p) {
+    pctx.font = `${STAMP[size] * k()}px "Apple Color Emoji","Segoe UI Emoji",sans-serif`;
+    pctx.textAlign = 'center'; pctx.textBaseline = 'middle'; pctx.fillText(stampCh, p.x, p.y);
+  }
+
+  /* flood fill: coloring pages fill whatever the outlines enclose; blank canvases fill similar colors */
+  function fill(x, y, hex) {
+    x |= 0; y |= 0; if (x < 0 || y < 0 || x >= W || y >= H) return;
+    const img = pctx.getImageData(0, 0, W, H), pd = new Uint32Array(img.data.buffer);
+    const rgb = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+    const col = ((255 << 24) | (rgb[2] << 16) | (rgb[1] << 8) | rgb[0]) >>> 0;
+    let test;
+    if (page) {
+      const la = lctx.getImageData(0, 0, W, H).data;
+      if (la[(y * W + x) * 4 + 3] > 200) return; // tapped on an outline
+      test = (i) => la[i * 4 + 3] <= 200;
+    } else {
+      const target = pd[y * W + x], tol = 48;
+      const near = (a, b) => Math.abs((a & 255) - (b & 255)) <= tol && Math.abs(((a >> 8) & 255) - ((b >> 8) & 255)) <= tol && Math.abs(((a >> 16) & 255) - ((b >> 16) & 255)) <= tol;
+      if (near(target, col)) return;
+      test = (i) => near(pd[i], target);
+    }
+    const seen = new Uint8Array(W * H), stack = [y * W + x];
+    while (stack.length) {
+      const i = stack.pop(); if (seen[i] || !test(i)) continue;
+      const cy = (i / W) | 0, row = cy * W; let l = i - row, r = l;
+      while (l > 0 && !seen[row + l - 1] && test(row + l - 1)) l--;
+      while (r < W - 1 && !seen[row + r + 1] && test(row + r + 1)) r++;
+      for (let xx = l; xx <= r; xx++) { seen[row + xx] = 1; pd[row + xx] = col; }
+      for (const ny of [cy - 1, cy + 1]) {
+        if (ny < 0 || ny >= H) continue;
+        let inSpan = false;
+        for (let xx = l; xx <= r; xx++) {
+          const j = ny * W + xx, ok = !seen[j] && test(j);
+          if (ok && !inSpan) { stack.push(j); inSpan = true; } else if (!ok) inSpan = false;
+        }
+      }
+    }
+    if (!page) { // blank canvas: grow 1px so soft stroke edges don't leave a halo
+      const grow = [];
+      for (let i = 0; i < seen.length; i++) if (seen[i]) {
+        const cx = i % W;
+        if (cx > 0 && !seen[i - 1]) grow.push(i - 1);
+        if (cx < W - 1 && !seen[i + 1]) grow.push(i + 1);
+        if (i >= W && !seen[i - W]) grow.push(i - W);
+        if (i < seen.length - W && !seen[i + W]) grow.push(i + W);
+      }
+      grow.forEach((j) => { pd[j] = col; });
+    }
+    pctx.putImageData(img, 0, 0);
+  }
+
+  /* ============================ pointer input ============================ */
+  const ptrs = new Map();
+  const pos = (e) => { const r = board.getBoundingClientRect(); return { x: (e.clientX - r.left) * W / r.width, y: (e.clientY - r.top) * H / r.height }; };
+  board.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    if (ptrs.size === 0) pushUndo();
+    const p = pos(e);
+    if (tool === 'fill') { fill(p.x, p.y, color); saveSoon(); return; }
+    board.setPointerCapture(e.pointerId);
+    const st = { x: p.x, y: p.y, hue: Math.random() * 360, acc: 0 };
+    ptrs.set(e.pointerId, st);
+    if (tool === 'stamp') stampAt(p); else seg(st, p, { x: p.x + 0.01, y: p.y });
+  });
+  board.addEventListener('pointermove', (e) => {
+    const st = ptrs.get(e.pointerId); if (!st) return;
+    const evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [];
+    (evs.length ? evs : [e]).forEach((ev) => {
+      const p = pos(ev), a = { x: st.x, y: st.y };
+      if (tool === 'stamp') { st.acc += Math.hypot(p.x - a.x, p.y - a.y); if (st.acc >= STAMP[size] * k() * 0.8) { stampAt(p); st.acc = 0; } }
+      else seg(st, a, p);
+      st.x = p.x; st.y = p.y;
+    });
+  });
+  const up = (e) => { if (ptrs.delete(e.pointerId) && ptrs.size === 0) saveSoon(); };
+  board.addEventListener('pointerup', up); board.addEventListener('pointercancel', up);
+
+  /* ============================ toolbar ============================ */
+  function selectTool(t) {
+    tool = t;
+    document.querySelectorAll('#tools button').forEach((b) => b.classList.toggle('on', b.dataset.tool === t));
+    $('#stamps').hidden = t !== 'stamp';
+  }
+  document.querySelectorAll('#tools button').forEach((b) => b.addEventListener('click', () => selectTool(b.dataset.tool)));
+  document.querySelectorAll('#sizes button').forEach((b) => b.addEventListener('click', () => {
+    size = +b.dataset.s; document.querySelectorAll('#sizes button').forEach((x) => x.classList.toggle('on', x === b));
+  }));
+
+  const COLORS = ['#ff3b3b', '#ff8a1f', '#ffd21f', '#a6e22e', '#2fbf4f', '#14a38b', '#22c7e8', '#2d7dff', '#5b3df5', '#a24bff', '#ff4fb8', '#ff9db5', '#8b5a2b', '#e8b38a', '#ffffff', '#b0b0b0', '#222222'];
+  const colorsEl = $('#colors');
+  function pickColor(hex, el) {
+    color = hex; if (tool === 'eraser') selectTool('crayon');
+    colorsEl.querySelectorAll('.sw').forEach((s) => s.classList.toggle('on', s === el));
+  }
+  COLORS.forEach((hex, i) => {
+    const b = document.createElement('button'); b.className = 'sw' + (i === 0 ? ' on' : ''); b.style.setProperty('--c', hex);
+    b.setAttribute('aria-label', 'Kleur ' + hex); b.addEventListener('click', () => pickColor(hex, b)); colorsEl.appendChild(b);
+  });
+  colorsEl.insertAdjacentHTML('beforeend', '<label class="sw custom" aria-label="Meer kleuren"><input type="color" id="custom" value="#ff3b3b"></label>');
+  $('#custom').addEventListener('input', (e) => pickColor(e.target.value, e.target.parentElement));
+
+  const stampsEl = $('#stamps');
+  ['🦄', '🐶', '🐱', '🐠', '🦋', '🌸', '⭐', '❤️', '🌈', '🚀', '🍦', '🎈', '🐢', '🦖', '🍓', '☀️', '🐸', '🎂'].forEach((ch, i) => {
+    const b = document.createElement('button'); b.textContent = ch; if (!i) b.className = 'on';
+    b.addEventListener('click', () => { stampCh = ch; stampsEl.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b)); $('#tools [data-tool=stamp] span').textContent = ch; });
+    stampsEl.appendChild(b);
+  });
+
+  /* ============================ header actions ============================ */
+  $('#btnUndo').addEventListener('click', () => { const s = undoStack.pop(); if (s) { pctx.putImageData(s, 0, 0); updateUndo(); saveSoon(); } });
+  $('#btnClear').addEventListener('click', () => { pushUndo(); pctx.fillStyle = bg; pctx.fillRect(0, 0, W, H); saveSoon(); toast('Gewist! Tik op ↩️ om het terug te halen'); });
+  $('#btnSave').addEventListener('click', async () => {
+    const c = document.createElement('canvas'); c.width = W; c.height = H;
+    const x = c.getContext('2d'); x.drawImage(paint, 0, 0); x.drawImage(lines, 0, 0);
+    const blob = await new Promise((r) => c.toBlob(r, 'image/png'));
+    const file = new File([blob], 'mijn-tekening.png', { type: 'image/png' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try { await navigator.share({ files: [file], title: 'Mijn tekening' }); toast('Bewaard! 🎉'); } catch (e) {}
+    } else {
+      const u = URL.createObjectURL(blob), a = document.createElement('a');
+      a.href = u; a.download = 'mijn-tekening.png'; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(u), 10000); toast('Bewaard! 🎉');
+    }
+  });
+  let toastT;
+  function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2200); }
+
+  /* ============================ picker ============================ */
+  const picker = $('#picker');
+  function start(id, bgc) {
+    if (dirty && !confirm('Nieuwe tekening beginnen? Je huidige tekening wordt gewist (druk eerst op Bewaar om hem te bewaren).')) return;
+    setPage(id, bgc); picker.hidden = true; saveSoon();
+  }
+  [['Wit', '#ffffff'], ['Zonnig', '#fff2a8'], ['Lucht', '#bfe6ff'], ['Nacht', '#14143c']].forEach(([n, bgc]) => {
+    const b = document.createElement('button'); b.className = 'thumb blank'; b.style.background = bgc;
+    b.innerHTML = `<b style="${n === 'Nacht' ? 'color:#fff' : ''}">${n}</b>`; b.addEventListener('click', () => start(null, bgc)); $('#blanks').appendChild(b);
+  });
+  PAGES.forEach((p) => {
+    const b = document.createElement('button'), cv = document.createElement('canvas'); b.className = 'thumb';
+    cv.width = cv.height = 240; const x = cv.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, 240, 240);
+    renderPage(x, 240, 240, p.id, 26);
+    b.appendChild(cv); b.insertAdjacentHTML('beforeend', `<b>${p.n}</b>`);
+    b.addEventListener('click', () => start(p.id, '#ffffff')); $('#pages').appendChild(b);
+  });
+  $('#btnHome').addEventListener('click', () => { location.href = '../index.html'; });
+  $('#btnPages').addEventListener('click', () => { picker.hidden = false; });
+  $('#closeP').addEventListener('click', () => { picker.hidden = true; });
+
+  ['gesturestart', 'contextmenu', 'dblclick'].forEach((ev) => document.addEventListener(ev, (e) => e.preventDefault()));
+  setPage(null, '#ffffff');
+  if (!restore()) picker.hidden = false;
+})();
+</script>
+</body>
+</html>

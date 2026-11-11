@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<title>Memory</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#2b1f5c">
+<link rel="apple-touch-icon" href="../icon-180.png">
+<link rel="stylesheet" href="../shared.css">
+<style>
+  .stage { display: flex; flex-direction: column; }
+  .board { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(var(--c), 1fr); grid-auto-rows: 1fr; gap: 10px; margin: 0 12px 14px; }
+  .card { position: relative; perspective: 700px; container-type: size; }
+  .in { position: absolute; inset: 0; transform-style: preserve-3d; transition: transform .35s; }
+  .card.up .in { transform: rotateY(180deg); }
+  .face {
+    position: absolute; inset: 0; border-radius: 18px; display: grid; place-items: center;
+    backface-visibility: hidden; -webkit-backface-visibility: hidden; font-size: clamp(28px, 52cqmin, 110px);
+  }
+  .back {
+    background: repeating-linear-gradient(45deg, #ffd23f 0 12px, #ffb02e 12px 24px);
+    box-shadow: inset 0 -6px 0 rgba(0,0,0,.2), 0 5px 0 rgba(0,0,0,.28); color: rgba(255,255,255,.95); text-shadow: 0 2px 3px rgba(0,0,0,.25);
+  }
+  .front { background: #fff; transform: rotateY(180deg); box-shadow: inset 0 -6px 0 rgba(0,0,0,.12), 0 5px 0 rgba(0,0,0,.28); }
+  .card.done .front { background: #c9f7c9; }
+  .card.done .in { animation: happy .5s; }
+  @keyframes happy { 50% { scale: 1.1; } }
+  .levels { margin: auto; display: grid; gap: 18px; text-align: center; padding: 20px; }
+  .levels h2 { margin: 0 0 4px; font-size: 28px; }
+  .levels .btn { font-size: 22px; padding: 18px 28px; }
+  .endcard { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; background: rgba(20,10,50,.78); z-index: 5; }
+  .endcard .big { font-size: 64px; }
+  .endcard h2 { margin: 0 0 4px; font-size: 32px; }
+  .endcard p { margin: 0 0 20px; font-size: 20px; }
+</style>
+</head>
+<body>
+<div id="app"><div class="stage" id="stage"></div></div>
+<script src="../shared.js"></script>
+<script>
+(() => {
+  const A = Arcade, stage = document.getElementById('stage');
+  A.header('Memory');
+  const EMOJI = ['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮', '🐷', '🐸', '🐵', '🦄', '🐙', '🦋', '🐢', '🐠'];
+  const LEVELS = [{ n: 'Makkelijk', cols: 2, pairs: 4, e: '🐣' }, { n: 'Gemiddeld', cols: 3, pairs: 6, e: '🐥' }, { n: 'Moeilijk', cols: 4, pairs: 8, e: '🦉' }];
+
+  function levels() {
+    stage.innerHTML = '<div class="levels"><h2>Kies een niveau</h2></div>';
+    const box = stage.firstChild;
+    LEVELS.forEach((L) => {
+      const b = document.createElement('button'); b.className = 'btn'; b.textContent = `${L.e} ${L.n}`;
+      b.addEventListener('click', () => { A.play('tap'); game(L); }); box.appendChild(b);
+    });
+  }
+
+  function game(L) {
+    stage.innerHTML = '<div class="status" id="st">Beurten: 0</div><div class="board" id="board"></div>';
+    const board = document.getElementById('board'), st = document.getElementById('st');
+    board.style.setProperty('--c', L.cols);
+    const deck = A.shuffle([...A.shuffle(EMOJI).slice(0, L.pairs)].flatMap((e) => [e, e]));
+    deck.forEach((e) => board.insertAdjacentHTML('beforeend', `<div class="card" data-e="${e}"><div class="in"><div class="face back">❓</div><div class="face front">${e}</div></div></div>`));
+    let first = null, lock = false, moves = 0, found = 0;
+
+    board.addEventListener('pointerdown', (ev) => {
+      const c = ev.target.closest('.card');
+      if (!c || lock || c.classList.contains('up')) return;
+      c.classList.add('up'); A.play('flip');
+      if (!first) { first = c; return; }
+      moves++; st.textContent = `Beurten: ${moves}`;
+      if (first.dataset.e === c.dataset.e) {
+        const a = first; first = null; found++;
+        setTimeout(() => {
+          [a, c].forEach((x) => x.classList.add('done')); A.play('match');
+          const r = c.getBoundingClientRect(); A.burst(r.x + r.width / 2, r.y + r.height / 2);
+          if (found === L.pairs) setTimeout(() => win(L, moves), 600);
+        }, 350);
+      } else {
+        lock = true; const a = first; first = null;
+        setTimeout(() => { A.play('wrong'); }, 450);
+        setTimeout(() => { a.classList.remove('up'); c.classList.remove('up'); lock = false; }, 900);
+      }
+    });
+  }
+
+  function win(L, moves) {
+    A.play('win'); A.confetti();
+    const stars = moves <= L.pairs + 2 ? 3 : moves <= L.pairs * 2 ? 2 : 1;
+    const el = document.createElement('div'); el.className = 'endcard';
+    el.innerHTML = `<div><div class="big">${'⭐'.repeat(stars)}</div><h2>Gelukt!</h2><p>${moves} beurten</p><div class="row" style="display:flex;gap:12px;justify-content:center"><button class="btn" id="again">Nog een keer</button><button class="btn alt" id="lv">Niveaus</button></div></div>`;
+    stage.appendChild(el);
+    el.querySelector('#again').addEventListener('click', () => game(L));
+    el.querySelector('#lv').addEventListener('click', levels);
+  }
+
+  A.start({ emoji: '🃏', title: 'Memory', hint: 'Draai twee kaartjes om. Zoek de paartjes!' }, levels);
+})();
+</script>
+</body>
+</html>

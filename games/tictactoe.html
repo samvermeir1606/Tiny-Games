@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<title>Boter, kaas en eieren</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#2b1f5c">
+<link rel="apple-touch-icon" href="../icon-180.png">
+<link rel="stylesheet" href="../shared.css">
+<style>
+  .stage { display: flex; flex-direction: column; align-items: center; padding: 0 14px 14px; }
+  #score { display: flex; gap: 10px; width: 100%; max-width: 420px; margin: 2px 0 6px; }
+  #score div { flex: 1; text-align: center; background: rgba(255,255,255,.14); border-radius: 18px; padding: 6px 0; font-weight: 900; font-size: 20px; }
+  #score span { display: block; font-size: 28px; line-height: 1.1; }
+  #msg { font-size: 22px; font-weight: 900; min-height: 34px; margin: 4px 0 8px; text-align: center; }
+  #wrap { flex: 1; min-height: 0; width: 100%; display: grid; place-items: center; }
+  #board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 8px; border-radius: 24px; background: rgba(255,255,255,.12); }
+  .sq { border-radius: 18px; background: #fff; color: #333; font-size: 0; display: grid; place-items: center; box-shadow: inset 0 -6px 0 rgba(0,0,0,.12); }
+  .sq b { font-size: clamp(36px, 15vmin, 90px); font-weight: 400; animation: pop .25s; line-height: 1; }
+  .sq.win { background: #fff3b0; animation: glow .5s infinite alternate; }
+  @keyframes pop { from { scale: .2; } to { scale: 1; } }
+  @keyframes glow { to { scale: 1.06; } }
+  #ctl { display: flex; gap: 10px; padding-top: 10px; }
+  #ctl button { border-radius: 20px; padding: 10px 16px; background: rgba(255,255,255,.18); font-weight: 800; font-size: 14px; display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 84px; }
+  #ctl button span { font-size: 26px; line-height: 1.1; }
+  #ctl #again { background: #ffd23f; color: #4a2a7a; box-shadow: 0 4px 0 #c9971a; }
+</style>
+</head>
+<body>
+<div id="app"><div class="stage" id="stage">
+  <div id="score"></div>
+  <div id="msg"></div>
+  <div id="wrap"><div id="board"></div></div>
+  <div id="ctl">
+    <button id="mode"><span>🤖</span><i style="font-style:normal">Tegen computer</i></button>
+    <button id="pieces"><span>🎭</span>Stukken</button>
+    <button id="again"><span>🔄</span>Nieuw spel</button>
+  </div>
+</div></div>
+<script src="../shared.js"></script>
+<script>
+(() => {
+  const A = Arcade;
+  A.header('Boter, kaas en eieren');
+  const PAIRS = [['🐱', '🐶'], ['🌞', '🌙'], ['🍎', '🍌'], ['❌', '⭕'], ['🦄', '🐸']];
+  const LN = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+  let pi = 0, mode = 'cpu', b, turn, over, starter = 1, scores = { 1: 0, 2: 0, d: 0 };
+  const boardEl = document.getElementById('board'), msg = document.getElementById('msg'), scoreEl = document.getElementById('score'), wrap = document.getElementById('wrap');
+  const sym = (p) => PAIRS[pi][p - 1];
+
+  function fit() { const r = wrap.getBoundingClientRect(), s = Math.floor(Math.min(r.width, r.height) - 4); boardEl.style.width = boardEl.style.height = Math.max(180, Math.min(s, 460)) + 'px'; }
+  addEventListener('resize', fit);
+
+  function result(bd) {
+    for (const l of LN) if (bd[l[0]] && bd[l[0]] === bd[l[1]] && bd[l[0]] === bd[l[2]]) return { w: bd[l[0]], l };
+    return bd.every(Boolean) ? { w: 'd' } : null;
+  }
+  function minimax(bd, t, me) {
+    const r = result(bd); if (r) return r.w === 'd' ? 0 : r.w === me ? 10 : -10;
+    let best = t === me ? -Infinity : Infinity;
+    for (let i = 0; i < 9; i++) if (!bd[i]) {
+      bd[i] = t; const v = minimax(bd, t === 1 ? 2 : 1, me); bd[i] = 0;
+      best = t === me ? Math.max(best, v) : Math.min(best, v);
+    }
+    return best;
+  }
+  function cpuMove() {
+    const empty = [...Array(9).keys()].filter((i) => !b[i]);
+    if (!empty.length || over) return;
+    let move;
+    if (Math.random() < 0.35) move = A.rand(empty); // friendly: sometimes plays randomly
+    else {
+      let best = -Infinity, picks = [];
+      empty.forEach((i) => { b[i] = 2; const v = minimax(b, 1, 2); b[i] = 0; if (v > best) { best = v; picks = [i]; } else if (v === best) picks.push(i); });
+      move = A.rand(picks);
+    }
+    place(move);
+  }
+
+  function draw() {
+    boardEl.innerHTML = '';
+    b.forEach((v, i) => {
+      const s = document.createElement('button'); s.className = 'sq'; s.dataset.i = i;
+      s.innerHTML = v ? `<b>${sym(v)}</b>` : ''; boardEl.appendChild(s);
+    });
+    scoreEl.innerHTML = `<div><span>${sym(1)}</span>${scores[1]}</div><div><span>🤝</span>${scores.d}</div><div><span>${sym(2)}</span>${scores[2]}</div>`;
+  }
+  function say() {
+    if (over) return;
+    msg.textContent = mode === 'cpu' ? (turn === 1 ? `Jouw beurt ${sym(1)}` : 'Even denken… 🤔') : `${sym(turn)} is aan de beurt!`;
+  }
+  function place(i) {
+    b[i] = turn; draw(); A.play('tap');
+    const r = result(b);
+    if (r) {
+      over = true;
+      if (r.w === 'd') { scores.d++; msg.textContent = 'Gelijkspel! 🤝'; A.play('wrong'); }
+      else {
+        scores[r.w]++; r.l.forEach((k) => boardEl.children[k].classList.add('win'));
+        if (mode === 'cpu' && r.w === 2) { msg.textContent = 'De computer wint! Probeer nog eens 💪'; A.play('wrong'); }
+        else { msg.textContent = mode === 'cpu' ? 'Jij wint! 🎉' : `${sym(r.w)} wint! 🎉`; A.play('win'); A.confetti(); }
+      }
+      scoreEl.innerHTML = `<div><span>${sym(1)}</span>${scores[1]}</div><div><span>🤝</span>${scores.d}</div><div><span>${sym(2)}</span>${scores[2]}</div>`;
+      return;
+    }
+    turn = turn === 1 ? 2 : 1; say();
+    if (mode === 'cpu' && turn === 2) setTimeout(cpuMove, 550);
+  }
+  function newGame(keepStarter) {
+    b = Array(9).fill(0); over = false; if (!keepStarter) starter = starter === 1 ? 2 : 1; turn = starter; draw(); say(); fit();
+    if (mode === 'cpu' && turn === 2) setTimeout(cpuMove, 600);
+  }
+  boardEl.addEventListener('pointerdown', (e) => {
+    const s = e.target.closest('.sq'); if (!s || over || (mode === 'cpu' && turn === 2)) return;
+    const i = +s.dataset.i; if (b[i]) return; place(i);
+  });
+  document.getElementById('again').addEventListener('click', () => { A.play('tap'); newGame(); });
+  document.getElementById('pieces').addEventListener('click', () => { A.play('tap'); pi = (pi + 1) % PAIRS.length; draw(); say(); });
+  document.getElementById('mode').addEventListener('click', () => {
+    A.play('tap'); mode = mode === 'cpu' ? 'two' : 'cpu'; scores = { 1: 0, 2: 0, d: 0 }; starter = 2;
+    const m = document.getElementById('mode'); m.querySelector('span').textContent = mode === 'cpu' ? '🤖' : '👫'; m.querySelector('i').textContent = mode === 'cpu' ? 'Tegen computer' : '2 spelers';
+    newGame();
+  });
+  starter = 2; newGame();
+  A.start({ emoji: '⭕', title: 'Boter, kaas en eieren', hint: 'Zet drie op een rij! Speel tegen de computer of een vriendje.' });
+})();
+</script>
+</body>
+</html>

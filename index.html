@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<title>Tiny Arcade</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Tiny Arcade">
+<meta name="theme-color" content="#2b1f5c">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-192.png">
+<link rel="stylesheet" href="shared.css">
+<style>
+  #menu { flex: 1; min-height: 0; overflow-y: auto; padding: 4px 14px 20px; -webkit-overflow-scrolling: touch; }
+  #menu .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .tile {
+    position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+    aspect-ratio: 1 / 0.92; border-radius: 26px; font-weight: 900; font-size: 17px; text-align: center; padding: 8px;
+    background: linear-gradient(160deg, var(--a), var(--b)); color: #fff; text-shadow: 0 2px 3px rgba(0,0,0,.3);
+    box-shadow: inset 0 -8px 0 rgba(0,0,0,.18), 0 6px 0 rgba(0,0,0,.3);
+  }
+  .tile i { font-style: normal; font-size: 58px; line-height: 1.05; filter: drop-shadow(0 3px 2px rgba(0,0,0,.25)); }
+  .tile small { font-size: 12px; font-weight: 700; opacity: .9; }
+  .tile:active { transform: translateY(4px) scale(.98); box-shadow: inset 0 -8px 0 rgba(0,0,0,.18), 0 2px 0 rgba(0,0,0,.3); }
+  .sec { margin: 14px 4px 8px; font-size: 13px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; opacity: .75; }
+  .sec:first-child { margin-top: 4px; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="topbar">
+    <div style="width:46px"></div>
+    <h1 style="font-size:26px">Tiny Arcade</h1>
+    <button class="ib" id="arMute" aria-label="Geluid"></button>
+  </div>
+  <div id="menu" class="scroll"></div>
+</div>
+<script src="shared.js"></script>
+<script>
+  const SECTIONS = [
+    ['Maak iets', [
+      ['games/band.html', '🥁', 'Tiny Band', 'Muziek maken', '#ff5d73', '#ff9a3c'],
+      ['games/artist.html', '🎨', 'Tiny Artist', 'Tekenen & kleuren', '#a24bff', '#ff4fb8'],
+      ['games/stickers.html', '🦄', 'Stickers', 'Maak een plaatje', '#3fc7c7', '#4d8bff'],
+    ]],
+    ['Spelen', [
+      ['games/memory.html', '🃏', 'Memory', 'Vind de paartjes', '#ffb02e', '#ff7a45'],
+      ['games/bubbles.html', '🫧', 'Bellen knallen', 'Knal ze allemaal', '#4d8bff', '#22c7e8'],
+      ['games/maze.html', '🐭', 'Doolhof', 'Vind de kaas', '#2fbf4f', '#14a38b'],
+      ['games/whack.html', '🔨', 'Mollen meppen', 'Wees snel!', '#8b5a2b', '#d9822b'],
+      ['games/colors.html', '🌈', 'Kleuren', 'Tik op de kleur', '#ff4fb8', '#ffd21f'],
+      ['games/animals.html', '🐮', 'Dierengeluiden', 'Wie zegt boe?', '#6bd66b', '#2fbf4f'],
+    ]],
+    ['Met z\'n tweeën of tegen de computer', [
+      ['games/tictactoe.html', '⭕', 'Boter, kaas en eieren', 'Drie op een rij', '#9b6bff', '#5b3df5'],
+      ['games/connect4.html', '🔴', 'Vier op een rij', 'Laat vallen en win', '#ff5d73', '#e62b2b'],
+    ]],
+  ];
+  const menu = document.getElementById('menu');
+  const all = [];
+  SECTIONS.forEach(([title, items]) => {
+    const h = document.createElement('div'); h.className = 'sec'; h.textContent = title; menu.appendChild(h);
+    const g = document.createElement('div'); g.className = 'grid'; menu.appendChild(g);
+    items.forEach(([href, e, n, sub, a, b]) => {
+      all.push(href);
+      g.insertAdjacentHTML('beforeend', `<a class="tile" href="${href}" style="--a:${a};--b:${b}"><i>${e}</i>${n}<small>${sub}</small></a>`);
+    });
+    if (items.length % 2) {
+      g.insertAdjacentHTML('beforeend', `<a class="tile" href="#" id="surprise" style="--a:#ffd23f;--b:#ff9a3c"><i>🎲</i>Verras me!<small>Kies een spel</small></a>`);
+    }
+  });
+  const sp = document.getElementById('surprise');
+  if (sp) sp.addEventListener('click', (e) => { e.preventDefault(); location.href = all[(Math.random() * all.length) | 0]; });
+  Arcade.bindMute(document.getElementById('arMute'));
+</script>
+</body>
+</html>

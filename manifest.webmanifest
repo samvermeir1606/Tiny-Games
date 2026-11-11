@@ -1,0 +1,17 @@
+{
+  "name": "Tiny Arcade",
+  "short_name": "Tiny Arcade",
+  "description": "Kleine spelletjes, muziek en tekenen voor kleine handjes",
+  "lang": "nl",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#2b1f5c",
+  "theme_color": "#2b1f5c",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

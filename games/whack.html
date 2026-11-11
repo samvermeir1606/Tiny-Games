@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<title>Mollen meppen</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#2b1f5c">
+<link rel="apple-touch-icon" href="../icon-180.png">
+<link rel="stylesheet" href="../shared.css">
+<style>
+  body { background: linear-gradient(180deg, #6ec6ff 0 22%, #6bbf4a 22% 100%) fixed; }
+  .stage { display: flex; flex-direction: column; padding: 0 12px 14px; }
+  #hud { display: flex; align-items: center; gap: 12px; padding: 0 4px 8px; font-weight: 900; font-size: 22px; text-shadow: 0 2px 4px rgba(0,0,0,.35); }
+  #timer { flex: 1; height: 16px; border-radius: 8px; background: rgba(0,0,0,.25); overflow: hidden; }
+  #timer i { display: block; height: 100%; width: 100%; background: #ffd23f; transition: width .25s linear; }
+  #field { flex: 1; min-height: 0; display: grid; gap: 4px 10px; grid-template-columns: repeat(var(--c), 1fr); grid-template-rows: repeat(var(--r), 1fr); }
+  .cell { position: relative; container-type: size; }
+  .pit { position: absolute; left: 6%; right: 6%; bottom: 8%; height: 30%; border-radius: 50%; background: radial-gradient(ellipse at 50% 40%, #1e1006, #3b2410); }
+  .clip { position: absolute; left: 0; right: 0; top: 0; bottom: 23%; overflow: hidden; }
+  .mole { position: absolute; left: 0; right: 0; bottom: 0; text-align: center; font-size: min(68cqw, 62cqh); line-height: 1; transform: translateY(105%); transition: transform .12s ease-out; }
+  .cell.up .mole { transform: translateY(0); }
+  .rim { position: absolute; left: 3%; right: 3%; bottom: 3%; height: 22%; border-radius: 50%; background: radial-gradient(ellipse at 50% 30%, #a0672d, #7a4a1e); box-shadow: 0 3px 0 rgba(0,0,0,.25); }
+  .cell.hit .mole { transition-duration: .2s; }
+  #end { position: absolute; inset: 0; z-index: 5; display: grid; place-items: center; text-align: center; background: rgba(20,10,50,.78); }
+  #end[hidden] { display: none; }
+  #end .big { font-size: 64px; }
+  #end h2 { margin: 0 0 4px; font-size: 32px; } #end p { font-size: 22px; margin: 0 0 18px; }
+</style>
+</head>
+<body>
+<div id="app"><div class="stage" id="stage">
+  <div id="hud"><span id="score">🔨 0</span><div id="timer"><i></i></div></div>
+  <div id="field"></div>
+  <div id="end" hidden><div><div class="big">⏰</div><h2>Tijd om!</h2><p id="res"></p><button class="btn" id="again">Nog een keer</button></div></div>
+</div></div>
+<script src="../shared.js"></script>
+<script>
+(() => {
+  const A = Arcade;
+  A.header('Mollen meppen');
+  const field = document.getElementById('field'), scoreEl = document.getElementById('score'), timerI = document.querySelector('#timer i');
+  const MOLES = ['🐹', '🐭', '🐰', '🐻', '🐷'], DUR = 30;
+  let cells = [], score = 0, left = DUR, running = false, spawnTimer, tickTimer;
+
+  function build() {
+    const landscape = innerWidth > innerHeight, c = landscape ? 4 : 3, r = landscape ? 3 : 4;
+    field.style.setProperty('--c', c); field.style.setProperty('--r', r); field.innerHTML = ''; cells = [];
+    for (let i = 0; i < c * r; i++) {
+      field.insertAdjacentHTML('beforeend', '<div class="cell"><div class="pit"></div><div class="clip"><div class="mole"></div></div><div class="rim"></div></div>');
+      const el = field.lastChild; el.state = 0; cells.push(el);
+    }
+  }
+  function popUp() {
+    if (!running) return;
+    const free = cells.filter((c) => !c.classList.contains('up'));
+    if (free.length) {
+      const c = A.rand(free), m = c.querySelector('.mole'); m.textContent = A.rand(MOLES); c.classList.remove('hit'); c.classList.add('up'); c.state = 1;
+      const stay = Math.max(600, 1250 - score * 14);
+      c._t = setTimeout(() => { c.classList.remove('up'); c.state = 0; }, stay);
+    }
+    const gap = Math.max(380, 850 - score * 12);
+    spawnTimer = setTimeout(popUp, gap + Math.random() * 250);
+  }
+  field.addEventListener('pointerdown', (e) => {
+    const c = e.target.closest('.cell'); if (!c || !running) return;
+    if (c.state === 1) {
+      c.state = 2; clearTimeout(c._t); c.querySelector('.mole').textContent = '😵'; c.classList.add('hit'); A.play('whack');
+      score++; scoreEl.textContent = '🔨 ' + score; const r = c.getBoundingClientRect(); A.burst(r.x + r.width / 2, r.y + r.height * 0.4, ['⭐', '💥', '✨'], 5);
+      setTimeout(() => { c.classList.remove('up'); c.state = 0; }, 260);
+    } else if (c.state === 0) A.play('miss');
+  });
+  function startRound() {
+    document.getElementById('end').hidden = true; build(); score = 0; left = DUR; scoreEl.textContent = '🔨 0'; running = true; timerI.style.width = '100%';
+    popUp();
+    tickTimer = setInterval(() => {
+      left--; timerI.style.width = (left / DUR * 100) + '%';
+      if (left <= 0) finish();
+    }, 1000);
+  }
+  function finish() {
+    running = false; clearInterval(tickTimer); clearTimeout(spawnTimer); cells.forEach((c) => { clearTimeout(c._t); c.classList.remove('up'); });
+    const best = +(A.ls.get('wm-best') || 0), isBest = score > best; if (isBest) A.ls.set('wm-best', score);
+    document.getElementById('res').textContent = `Je hebt ${score} mollen geraakt! ${isBest ? '🏆 Nieuw record!' : '(record: ' + best + ')'}`;
+    document.getElementById('end').hidden = false; A.play('win'); if (isBest || score >= 10) A.confetti();
+  }
+  document.getElementById('again').addEventListener('click', () => { A.play('tap'); startRound(); });
+  build();
+  A.start({ emoji: '🔨', title: 'Mollen meppen', hint: 'Tik op de mollen voordat ze zich verstoppen! Je hebt 30 seconden.' }, startRound);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<title>Doolhof</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#2b1f5c">
+<link rel="apple-touch-icon" href="../icon-180.png">
+<link rel="stylesheet" href="../shared.css">
+<style>
+  #cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  #hint { position: absolute; left: 0; right: 0; bottom: 14px; text-align: center; font-size: 20px; font-weight: 800; pointer-events: none; transition: opacity .4s; text-shadow: 0 2px 4px rgba(0,0,0,.4); }
+  #next { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; background: rgba(20,10,50,.7); }
+  #next[hidden] { display: none; }
+  #next .big { font-size: 72px; }
+</style>
+</head>
+<body>
+<div id="app"><div class="stage" id="stage">
+  <canvas id="cv"></canvas>
+  <div id="hint"></div>
+  <div id="next" hidden><div><div class="big">🎉</div><h1 style="margin:0 0 16px">Gevonden!</h1><button class="btn" id="nextBtn">Volgend doolhof ▶</button></div></div>
+</div></div>
+<script src="../shared.js"></script>
+<script>
+(() => {
+  const A = Arcade;
+  const bar = A.header('Doolhof', { extra: '<button class="ib" id="again" aria-label="Nieuw doolhof">🔄</button>' });
+  const stage = document.getElementById('stage'), cv = document.getElementById('cv'), ctx = cv.getContext('2d'), hint = document.getElementById('hint');
+  const LEVELS = [[3, 5], [4, 6], [5, 7], [6, 8], [7, 10], [8, 11]];
+  const CHARS = [['🐭', '🧀'], ['🐶', '🦴'], ['🐰', '🥕'], ['🐻', '🍯'], ['🐱', '🐟'], ['🐵', '🍌']];
+  let W, H, dpr, lvl = 0, cols, rows, cells, cur, goal, path, px, py, cs, ox, oy, won = false, last = null, moved = false;
+
+  function resize() {
+    const r = stage.getBoundingClientRect(); dpr = Math.min(devicePixelRatio || 1, 2); W = r.width; H = r.height;
+    cv.width = W * dpr; cv.height = H * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0); if (cells) layout();
+  }
+  function layout() {
+    const m = 14; cs = Math.floor(Math.min((W - 2 * m) / cols, (H - 2 * m - 30) / rows)); ox = (W - cs * cols) / 2; oy = (H - cs * rows) / 2 - 8;
+  }
+  const cc = (i) => [ox + (i % cols + 0.5) * cs, oy + ((i / cols | 0) + 0.5) * cs];
+
+  function gen(c, r) {
+    const g = Array.from({ length: c * r }, () => ({ n: 1, e: 1, s: 1, w: 1, v: 0 })), stack = [0]; g[0].v = 1;
+    while (stack.length) {
+      const i = stack[stack.length - 1], x = i % c, y = (i / c) | 0, nb = [];
+      if (y > 0 && !g[i - c].v) nb.push([i - c, 'n', 's']);
+      if (x < c - 1 && !g[i + 1].v) nb.push([i + 1, 'e', 'w']);
+      if (y < r - 1 && !g[i + c].v) nb.push([i + c, 's', 'n']);
+      if (x > 0 && !g[i - 1].v) nb.push([i - 1, 'w', 'e']);
+      if (!nb.length) { stack.pop(); continue; }
+      const [j, a, b] = A.rand(nb); g[i][a] = 0; g[j][b] = 0; g[j].v = 1; stack.push(j);
+    }
+    for (let k = 0; k < c * r * 0.07; k++) { // knock out a few walls so there is more than one way
+      const x = (Math.random() * (c - 1)) | 0, y = (Math.random() * (r - 1)) | 0, i = y * c + x;
+      if (Math.random() < 0.5) { g[i].e = 0; g[i + 1].w = 0; } else { g[i].s = 0; g[i + c].n = 0; }
+    }
+    return g;
+  }
+  function newMaze() {
+    let [c, r] = LEVELS[Math.min(lvl, LEVELS.length - 1)]; if (W > H) [c, r] = [r, c];
+    cols = c; rows = r; cells = gen(c, r); cur = 0; goal = c * r - 1; path = [0]; won = false; layout();
+    [px, py] = cc(0); document.getElementById('next').hidden = true; last = null;
+    bar.querySelector('h1').textContent = 'Doolhof · Level ' + (lvl + 1);
+    hint.style.opacity = lvl === 0 && !moved ? 1 : 0;
+    hint.textContent = `Sleep ${CHARS[lvl % CHARS.length][0]} naar ${CHARS[lvl % CHARS.length][1]}`;
+  }
+
+  const D = { e: [1, 0], w: [-1, 0], s: [0, 1], n: [0, -1] };
+  function tryMove(ci) {
+    if (ci === cur || won) return;
+    const dx = ci % cols - cur % cols, dy = ((ci / cols) | 0) - ((cur / cols) | 0);
+    const d = dx === 1 && !dy ? 'e' : dx === -1 && !dy ? 'w' : dy === 1 && !dx ? 's' : dy === -1 && !dx ? 'n' : null;
+    if (!d || cells[cur][d]) return;
+    if (path.length > 1 && path[path.length - 2] === ci) path.pop(); else path.push(ci);
+    cur = ci; moved = true; hint.style.opacity = 0; A.play('step', path.length);
+    if (cur === goal) win();
+  }
+  function cellAt(x, y) {
+    const cx = Math.floor((x - ox) / cs), cy = Math.floor((y - oy) / cs);
+    return cx < 0 || cy < 0 || cx >= cols || cy >= rows ? -1 : cy * cols + cx;
+  }
+  function steer(a, b) {
+    const n = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / (cs / 4)));
+    for (let i = 1; i <= n; i++) { const c = cellAt(a.x + (b.x - a.x) * i / n, a.y + (b.y - a.y) * i / n); if (c >= 0) tryMove(c); }
+  }
+  const pt = (e) => { const r = cv.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
+  cv.addEventListener('pointerdown', (e) => { cv.setPointerCapture(e.pointerId); last = pt(e); steer(last, last); });
+  cv.addEventListener('pointermove', (e) => { if (!last) return; const p = pt(e); steer(last, p); last = p; });
+  cv.addEventListener('pointerup', () => { last = null; }); cv.addEventListener('pointercancel', () => { last = null; });
+
+  function win() {
+    won = true; A.play('win'); A.confetti();
+    setTimeout(() => { document.getElementById('next').hidden = false; }, 700);
+  }
+  document.getElementById('nextBtn').addEventListener('click', () => { lvl++; newMaze(); });
+  document.getElementById('again').addEventListener('click', () => { A.play('tap'); newMaze(); });
+
+  let t0 = performance.now();
+  function frame(t) {
+    const dt = Math.min(0.05, (t - t0) / 1000); t0 = t;
+    if (cells) {
+      const [tx, ty] = cc(cur), k = Math.min(1, dt * 16); px += (tx - px) * k; py += (ty - py) * k;
+      ctx.clearRect(0, 0, W, H);
+      ctx.fillStyle = 'rgba(255,255,255,.12)'; ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(ox, oy, cs * cols, cs * rows, 12); else ctx.rect(ox, oy, cs * cols, cs * rows); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,210,63,.55)'; ctx.lineWidth = cs * 0.34; ctx.lineCap = ctx.lineJoin = 'round'; ctx.beginPath();
+      path.forEach((i, n) => { const [x, y] = cc(i); n ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.lineTo(px, py); ctx.stroke();
+      ctx.font = `${cs * 0.7}px "Apple Color Emoji","Segoe UI Emoji",sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#000';
+      const [gx, gy] = cc(goal), [, goalE] = CHARS[lvl % CHARS.length], [charE] = CHARS[lvl % CHARS.length];
+      ctx.fillText(goalE, gx, gy + Math.sin(t / 300) * cs * 0.05);
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = Math.max(4, cs * 0.1); ctx.beginPath();
+      cells.forEach((c, i) => {
+        const x = ox + (i % cols) * cs, y = oy + ((i / cols) | 0) * cs;
+        if (c.n) { ctx.moveTo(x, y); ctx.lineTo(x + cs, y); }
+        if (c.w) { ctx.moveTo(x, y); ctx.lineTo(x, y + cs); }
+        if (c.e && i % cols === cols - 1) { ctx.moveTo(x + cs, y); ctx.lineTo(x + cs, y + cs); }
+        if (c.s && ((i / cols) | 0) === rows - 1) { ctx.moveTo(x, y + cs); ctx.lineTo(x + cs, y + cs); }
+      });
+      ctx.stroke();
+      ctx.font = `${cs * 0.72}px "Apple Color Emoji","Segoe UI Emoji",sans-serif`; ctx.fillText(charE, px, py + Math.sin(t / 200) * cs * 0.03);
+    }
+    requestAnimationFrame(frame);
+  }
+  resize(); addEventListener('resize', resize); newMaze(); requestAnimationFrame(frame);
+  A.start({ emoji: '🐭', title: 'Doolhof', hint: 'Sleep met je vinger om de muis naar de kaas te brengen!' });
+})();
+</script>
+</body>
+</html>

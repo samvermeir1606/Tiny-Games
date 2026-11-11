@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<title>Kleuren</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#2b1f5c">
+<link rel="apple-touch-icon" href="../icon-180.png">
+<link rel="stylesheet" href="../shared.css">
+<style>
+  .stage { display: flex; flex-direction: column; align-items: center; padding: 0 14px 16px; }
+  #score { font-size: 22px; font-weight: 900; margin: 2px 0; }
+  #q { display: flex; align-items: center; gap: 12px; margin: 8px 0 12px; }
+  #word { font-size: clamp(30px, 9vw, 44px); font-weight: 900; text-align: center; text-shadow: 0 3px 6px rgba(0,0,0,.3); }
+  #say { width: 52px; height: 52px; border-radius: 50%; background: #ffd23f; font-size: 26px; box-shadow: 0 4px 0 #c9971a; }
+  #grid { flex: 1; min-height: 0; width: 100%; max-width: 520px; display: grid; gap: 14px; grid-template-columns: repeat(var(--c), 1fr); grid-auto-rows: 1fr; }
+  .dotc {
+    border-radius: 50%; background: var(--c); border: 5px solid rgba(255,255,255,.9); box-shadow: inset 0 -10px 0 rgba(0,0,0,.18), 0 6px 0 rgba(0,0,0,.28);
+    justify-self: center; align-self: center; width: min(100%, var(--h)); aspect-ratio: 1; animation: bob 2.4s ease-in-out infinite;
+    transition: transform .3s, opacity .3s;
+  }
+  .dotc:nth-child(2n) { animation-delay: -.8s; } .dotc:nth-child(3n) { animation-delay: -1.5s; }
+  @keyframes bob { 50% { translate: 0 -6px; } }
+  .dotc.gone { transform: scale(0); opacity: 0; }
+  .dotc.right { transform: scale(1.18); }
+  .dotc.wrong { opacity: .35; }
+</style>
+</head>
+<body>
+<div id="app"><div class="stage" id="stage">
+  <div id="score">⭐ 0</div>
+  <div id="q"><div id="word"></div><button id="say" aria-label="Zeg het nog eens">🔊</button></div>
+  <div id="grid"></div>
+</div></div>
+<script src="../shared.js"></script>
+<script>
+(() => {
+  const A = Arcade;
+  A.header('Kleuren');
+  const COLORS = [
+    { n: 'rood', c: '#ff3b3b' }, { n: 'blauw', c: '#2d7dff' }, { n: 'geel', c: '#ffd21f' }, { n: 'groen', c: '#2fbf4f' },
+    { n: 'oranje', c: '#ff8a1f' }, { n: 'paars', c: '#a24bff' }, { n: 'roze', c: '#ff6bb5' }, { n: 'bruin', c: '#8b5a2b' },
+    { n: 'zwart', c: '#222' }, { n: 'wit', c: '#ffffff' },
+  ];
+  const grid = document.getElementById('grid'), word = document.getElementById('word'), scoreEl = document.getElementById('score');
+  let target, score = 0, locked = true, prev;
+  const phrase = () => `Tik op ${target.n}!`;
+
+  function round() {
+    locked = false;
+    const n = score >= 12 ? 9 : score >= 5 ? 6 : 4, cols = n === 4 ? 2 : 3;
+    do { target = A.rand(COLORS); } while (target === prev); prev = target;
+    const opts = A.shuffle([target, ...A.shuffle(COLORS.filter((c) => c !== target)).slice(0, n - 1)]);
+    grid.style.setProperty('--c', cols); grid.innerHTML = '';
+    const h = Math.min(190, (Math.min(innerHeight - 260, 520) / Math.ceil(n / cols)) - 14) + 'px'; grid.style.setProperty('--h', h);
+    opts.forEach((c) => {
+      const d = document.createElement('button'); d.className = 'dotc'; d.style.setProperty('--c', c.c); d.setAttribute('aria-label', c.n);
+      d.addEventListener('click', () => pick(c, d)); grid.appendChild(d);
+    });
+    word.textContent = phrase(); setTimeout(() => A.say(phrase()), 250);
+  }
+  function pick(c, d) {
+    if (locked || d.classList.contains('wrong')) return;
+    if (c === target) {
+      locked = true; score++; scoreEl.textContent = '⭐ ' + score; d.classList.add('right'); A.play('ding');
+      [...grid.children].forEach((x) => { if (x !== d) x.classList.add('gone'); });
+      const r = d.getBoundingClientRect(); A.burst(r.x + r.width / 2, r.y + r.height / 2, ['⭐', '✨', '💖'], 8);
+      word.textContent = `Goed zo! ${target.n}! 🎉`;
+      if (score % 5 === 0) { A.confetti(30); setTimeout(() => A.play('win'), 300); }
+      setTimeout(round, 1300);
+    } else { d.classList.add('wrong', 'shake'); A.play('wrong'); }
+  }
+  document.getElementById('say').addEventListener('click', () => { if (target) A.say(phrase()); });
+  A.start({ emoji: '🌈', title: 'Kleuren', hint: 'Luister en tik op de juiste kleur!' }, round);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<title>Dierengeluiden</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#2b1f5c">
+<link rel="apple-touch-icon" href="../icon-180.png">
+<link rel="stylesheet" href="../shared.css">
+<style>
+  .stage { display: flex; flex-direction: column; align-items: center; padding: 0 14px 16px; }
+  #score { font-size: 22px; font-weight: 900; margin: 2px 0 4px; }
+  #q { font-size: 22px; font-weight: 800; min-height: 32px; text-align: center; margin: 6px 0 10px; }
+  #spk {
+    width: min(38vw, 170px); aspect-ratio: 1; border-radius: 50%; font-size: min(18vw, 80px); background: #ffd23f;
+    box-shadow: inset 0 -8px 0 rgba(0,0,0,.18), 0 7px 0 #c9971a; display: grid; place-items: center;
+  }
+  #spk:active { transform: translateY(4px); box-shadow: inset 0 -8px 0 rgba(0,0,0,.18), 0 3px 0 #c9971a; }
+  #spk.pulse { animation: pulse .6s; }
+  @keyframes pulse { 40% { scale: 1.12; } }
+  #choices { flex: 1; min-height: 0; width: 100%; max-width: 520px; display: grid; gap: 12px; margin-top: 18px; grid-template-columns: repeat(var(--c), 1fr); grid-auto-rows: 1fr; }
+  .choice {
+    border-radius: 24px; background: #fff; color: #4a2a7a; font-weight: 900; font-size: 18px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+    box-shadow: inset 0 -6px 0 rgba(0,0,0,.12), 0 6px 0 rgba(0,0,0,.28); container-type: size; max-height: 220px;
+  }
+  .choice i { font-style: normal; font-size: clamp(36px, 52cqmin, 90px); line-height: 1.1; }
+  .choice.right { background: #b9f6b9; scale: 1.06; }
+  .choice.wrong { background: #ffd0d0; opacity: .45; }
+</style>
+</head>
+<body>
+<div id="app"><div class="stage" id="stage">
+  <div id="score">⭐ 0</div>
+  <div id="q">Welk dier maakt dit geluid?</div>
+  <button id="spk" aria-label="Speel het geluid af">🔊</button>
+  <div id="choices"></div>
+</div></div>
+<script src="../shared.js"></script>
+<script>
+(() => {
+  const A = Arcade;
+  A.header('Dierengeluiden');
+  const V = (o) => A.voc(o), many = (o, ds) => ds.forEach((d) => A.voc({ ...o, delay: d }));
+  const ANIMALS = [
+    { n: 'Kat', s: 'Miauw', e: '🐱', f: () => V({ type: 'sawtooth', pts: [[0, 450], [.15, 900], [.4, 700], [.65, 380]], dur: .7, peak: .5, lp: 3000, pk: [1400, 2, 10], vib: [7, 15] }) },
+    { n: 'Hond', s: 'Woef', e: '🐶', f: () => many({ type: 'sawtooth', pts: [[0, 320], [.12, 160]], dur: .14, peak: .8, lp: 1200 }, [0, .22]) },
+    { n: 'Eend', s: 'Kwak', e: '🦆', f: () => many({ type: 'square', pts: [[0, 520], [.1, 380]], dur: .16, peak: .3, lp: 2500, pk: [1300, 3, 10] }, [0, .2]) },
+    { n: 'Koe', s: 'Boe', e: '🐮', f: () => V({ type: 'sawtooth', pts: [[0, 140], [.25, 170], [.9, 120]], dur: 1, peak: .6, lp: 700, pk: [500, 2, 10], vib: [5, 4] }) },
+    { n: 'Vogel', s: 'Tjilp', e: '🐦', f: () => many({ type: 'sine', pts: [[0, 3000], [.09, 4300]], dur: .1, peak: .35 }, [0, .13, .26]) },
+    { n: 'Kikker', s: 'Kwaak', e: '🐸', f: () => many({ type: 'square', pts: [[0, 130], [.2, 100]], dur: .22, peak: .35, lp: 900, am: [35, 1] }, [0, .3]) },
+    { n: 'Uil', s: 'Hoe hoe', e: '🦉', f: () => { V({ type: 'sine', pts: [[0, 420], [.4, 360]], dur: .4, peak: .6 }); V({ type: 'sine', pts: [[0, 420], [.6, 330]], dur: .6, peak: .6, delay: .5 }); } },
+    { n: 'Varken', s: 'Knor', e: '🐷', f: () => V({ type: 'sawtooth', pts: [[0, 220], [.08, 150], [.2, 260], [.3, 140]], dur: .3, peak: .6, lp: 1500, pk: [900, 2, 8] }) },
+    { n: 'Leeuw', s: 'Brul', e: '🦁', f: () => { V({ type: 'sawtooth', pts: [[0, 110], [.3, 150], [1, 70]], dur: 1.1, peak: .6, lp: 900, am: [28, .8] }); A.noise(A.now(), .9, .3, 'lowpass', 700); } },
+  ];
+  const choicesEl = document.getElementById('choices'), qEl = document.getElementById('q'), spk = document.getElementById('spk'), scoreEl = document.getElementById('score');
+  let target, prev, score = 0, locked = true;
+
+  function replay() { spk.classList.remove('pulse'); void spk.offsetWidth; spk.classList.add('pulse'); target.f(); }
+  function round() {
+    locked = false; const n = score >= 6 ? 4 : 3;
+    do { target = A.rand(ANIMALS); } while (target === prev);
+    prev = target;
+    const opts = A.shuffle([target, ...A.shuffle(ANIMALS.filter((a) => a !== target)).slice(0, n - 1)]);
+    choicesEl.style.setProperty('--c', n === 4 ? 2 : 3); choicesEl.innerHTML = '';
+    opts.forEach((a) => {
+      const b = document.createElement('button'); b.className = 'choice'; b.innerHTML = `<i>${a.e}</i>${a.n}`;
+      b.addEventListener('click', () => pick(a, b)); choicesEl.appendChild(b);
+    });
+    qEl.textContent = 'Welk dier maakt dit geluid?';
+    setTimeout(replay, 450);
+  }
+  function pick(a, b) {
+    if (locked || b.classList.contains('wrong')) return;
+    if (a === target) {
+      locked = true; score++; scoreEl.textContent = '⭐ ' + score; b.classList.add('right'); A.play('ding');
+      qEl.textContent = `Het is een ${a.n.toLowerCase()}! ${a.s}!`;
+      const r = b.getBoundingClientRect(); A.burst(r.x + r.width / 2, r.y + r.height / 2, ['⭐', '✨', '💖'], 8);
+      if (score % 5 === 0) { A.confetti(30); setTimeout(() => A.play('win'), 300); }
+      setTimeout(round, 1700);
+    } else {
+      b.classList.add('wrong', 'shake'); A.play('wrong'); setTimeout(replay, 600);
+    }
+  }
+  spk.addEventListener('click', () => { if (target) replay(); });
+  A.start({ emoji: '🐮', title: 'Dierengeluiden', hint: 'Luister en tik op het dier dat dit geluid maakt!' }, round);
+})();
+</script>
+</body>
+</html>

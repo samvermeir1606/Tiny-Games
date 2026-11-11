@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<title>Stickers</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#2b1f5c">
+<link rel="apple-touch-icon" href="../icon-180.png">
+<link rel="stylesheet" href="../shared.css">
+<style>
+  .stage { display: flex; flex-direction: column; padding: 0 10px; }
+  #scene { flex: 1; min-height: 0; position: relative; border-radius: 22px; overflow: hidden; box-shadow: 0 6px 22px rgba(0,0,0,.4); background: #8fd3ff; }
+  #empty { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; font-weight: 800; font-size: 20px; color: rgba(0,0,0,.45); pointer-events: none; padding: 20px; }
+  .stk { position: absolute; line-height: 1; cursor: grab; padding: 4px; border-radius: 16px; filter: drop-shadow(0 3px 3px rgba(0,0,0,.25)); }
+  .stk.sel { outline: 3px dashed #fff; outline-offset: 0; background: rgba(255,255,255,.18); }
+  #bar { display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 56px; padding: 6px 0; font-weight: 800; }
+  #bar button { width: 46px; height: 46px; border-radius: 50%; background: rgba(255,255,255,.2); font-size: 22px; }
+  #bar button:active { background: rgba(255,255,255,.4); }
+  #cats { display: flex; gap: 8px; padding: 0 2px 6px; }
+  #cats button { flex: 1; height: 44px; border-radius: 16px; background: rgba(255,255,255,.14); font-size: 24px; }
+  #cats button.on { background: #fff; }
+  #tray { display: flex; gap: 8px; overflow-x: auto; padding: 4px 2px 12px; scrollbar-width: none; }
+  #tray::-webkit-scrollbar { display: none; }
+  #tray, #tray * { touch-action: pan-x; }
+  #tray button { flex: 0 0 auto; width: 62px; height: 62px; border-radius: 16px; background: rgba(255,255,255,.14); font-size: 36px; position: relative; overflow: hidden; }
+  #tray button:active { background: rgba(255,255,255,.4); }
+  #tray button.bgchip { border: 3px solid rgba(255,255,255,.6); font-size: 26px; }
+  #tray button.bgchip.on { border-color: #fff; box-shadow: 0 0 0 3px rgba(255,255,255,.4); }
+</style>
+</head>
+<body>
+<div id="app"><div class="stage" id="stage">
+  <div id="scene"><div id="empty">Tik hieronder op een sticker om hem toe te voegen,<br>sleep hem dan waar je wilt ✨</div></div>
+  <div id="bar"></div>
+  <div id="cats"></div>
+  <div id="tray"></div>
+</div></div>
+<script src="../shared.js"></script>
+<script>
+(() => {
+  const A = Arcade;
+  A.header('Stickers', { extra: '<button class="ib" id="clear" aria-label="Alles wissen">🗑️</button>' });
+  const SCENES = [
+    { i: '🌳', css: 'linear-gradient(#8fd3ff 0 58%,#7ed957 58% 100%)' },
+    { i: '🌊', css: 'linear-gradient(#bde8ff,#2d9dff 45%,#0b4fa8)' },
+    { i: '🌌', css: 'radial-gradient(circle at 20% 25%,#fff 0 1.5px,transparent 2px),radial-gradient(circle at 70% 15%,#fff 0 2px,transparent 2.5px),radial-gradient(circle at 45% 60%,#fff 0 1.5px,transparent 2px),radial-gradient(circle at 85% 70%,#fff 0 1.5px,transparent 2px),radial-gradient(circle at 10% 80%,#fff 0 2px,transparent 2.5px),radial-gradient(circle at 60% 35%,#fff 0 1px,transparent 1.5px),linear-gradient(#0b0b2e,#2a1060)' },
+    { i: '🌇', css: 'linear-gradient(#ffd89b,#ff7e8b 45%,#7b4fd6)' },
+    { i: '❄️', css: 'linear-gradient(#cfe8ff,#ffffff 60%,#e6f3ff)' },
+    { i: '🏜️', css: 'linear-gradient(#ffe29a 0 55%,#f4b860 55% 100%)' },
+  ];
+  const CATS = [
+    { i: '🖼️', scenes: true },
+    { i: '🐶', items: '🐶 🐱 🐭 🐹 🐰 🦊 🐻 🐼 🐨 🐯 🦁 🐮 🐷 🐸 🐵 🐔 🐧 🐦 🦆 🦉 🦄 🐴 🐢 🐍 🐙 🐠 🐳 🦋 🐝 🐞 🦖 🐘 🦒 🦓' },
+    { i: '🌳', items: '🌳 🌲 🌴 🌵 🌻 🌷 🌹 🌸 🍄 🌈 ☀️ 🌙 ⭐ ☁️ ⛄ 🔥 💧 🌊 🏔️ 🌋 🍎 🍌 🍓 🍉 🍕 🍦 🎂' },
+    { i: '🚗', items: '🏠 🏰 ⛺ 🚗 🚕 🚌 🚒 🚓 🚜 ✈️ 🚀 🛸 🚲 ⛵ 🚂 🎈 🎁 🧸 ⚽ 🎸 🎺 🎨 📚 🔭' },
+    { i: '🤩', items: '😀 😍 🤩 😎 🥳 🤖 👻 👽 🧚 🦸 🎩 👑 💖 💎 🎉 🎵 👶 🧒 👧 👦' },
+  ];
+  const split = (s) => s.split(' ');
+  const scene = document.getElementById('scene'), bar = document.getElementById('bar'), tray = document.getElementById('tray'), cats = document.getElementById('cats'), empty = document.getElementById('empty');
+  let state = { bg: 0, items: [] }, sel = null, zc = 1, uid = 1, cat = 1;
+  try { const s = JSON.parse(A.ls.get('ts-scene') || 'null'); if (s && s.items) { state = s; state.items.forEach((it) => { uid = Math.max(uid, it.id + 1); zc = Math.max(zc, it.z + 1); }); } } catch (e) {}
+  const save = () => A.ls.set('ts-scene', JSON.stringify(state));
+  const sw = () => scene.getBoundingClientRect().width;
+
+  function paintStk(el, it) {
+    const r = scene.getBoundingClientRect();
+    el.style.left = it.x * r.width + 'px'; el.style.top = it.y * r.height + 'px'; el.style.fontSize = it.s * r.width + 'px';
+    el.style.transform = `translate(-50%,-50%) scaleX(${it.f ? -1 : 1})`; el.style.zIndex = it.z;
+  }
+  function render() {
+    scene.style.background = SCENES[state.bg].css;
+    scene.querySelectorAll('.stk').forEach((n) => n.remove());
+    state.items.forEach((it) => {
+      const el = document.createElement('div'); el.className = 'stk' + (it.id === sel ? ' sel' : ''); el.textContent = it.e; el.dataset.id = it.id; paintStk(el, it); scene.appendChild(el);
+    });
+    empty.style.display = state.items.length ? 'none' : 'grid';
+    bar.innerHTML = '';
+    if (sel != null) {
+      [['➖', 'smaller'], ['➕', 'bigger'], ['↔️', 'flip'], ['🗑️', 'del'], ['✔️', 'done']].forEach(([e, a]) => {
+        const b = document.createElement('button'); b.textContent = e; b.addEventListener('click', () => act(a)); bar.appendChild(b);
+      });
+    } else bar.textContent = state.items.length ? 'Tik op een sticker om hem aan te passen' : '';
+  }
+  function act(a) {
+    const it = state.items.find((x) => x.id === sel); if (!it) return;
+    if (a === 'smaller') it.s = Math.max(0.07, it.s / 1.25);
+    if (a === 'bigger') it.s = Math.min(0.9, it.s * 1.25);
+    if (a === 'flip') it.f = !it.f;
+    if (a === 'del') { state.items = state.items.filter((x) => x !== it); sel = null; }
+    if (a === 'done') sel = null;
+    A.play('tap'); save(); render();
+  }
+
+  /* dragging stickers around the scene */
+  let drag = null;
+  scene.addEventListener('pointerdown', (e) => {
+    const el = e.target.closest('.stk');
+    if (!el) { if (sel != null) { sel = null; render(); } return; }
+    const it = state.items.find((x) => x.id === +el.dataset.id); e.preventDefault();
+    if (sel !== it.id) { sel = it.id; it.z = ++zc; render(); }
+    const live = scene.querySelector(`.stk[data-id="${it.id}"]`), r = scene.getBoundingClientRect();
+    live.setPointerCapture(e.pointerId);
+    drag = { it, el: live, dx: it.x * r.width - (e.clientX - r.left), dy: it.y * r.height - (e.clientY - r.top), id: e.pointerId };
+  });
+  scene.addEventListener('pointermove', (e) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    const r = scene.getBoundingClientRect();
+    drag.it.x = Math.max(0, Math.min(1, (e.clientX - r.left + drag.dx) / r.width)); drag.it.y = Math.max(0, Math.min(1, (e.clientY - r.top + drag.dy) / r.height));
+    paintStk(drag.el, drag.it);
+  });
+  const end = () => { if (drag) { drag = null; save(); } };
+  scene.addEventListener('pointerup', end); scene.addEventListener('pointercancel', end);
+
+  /* tray */
+  function buildTray() {
+    cats.querySelectorAll('button').forEach((b, i) => b.classList.toggle('on', i === cat));
+    tray.innerHTML = '';
+    const c = CATS[cat];
+    if (c.scenes) {
+      SCENES.forEach((s, i) => {
+        const b = document.createElement('button'); b.className = 'bgchip' + (i === state.bg ? ' on' : ''); b.style.background = s.css; b.textContent = s.i;
+        b.addEventListener('click', () => { state.bg = i; A.play('place'); save(); render(); buildTray(); }); tray.appendChild(b);
+      });
+    } else {
+      split(c.items).forEach((e) => {
+        const b = document.createElement('button'); b.textContent = e;
+        b.addEventListener('click', () => {
+          const it = { id: uid++, e, x: 0.5 + (Math.random() - 0.5) * 0.35, y: 0.45 + (Math.random() - 0.5) * 0.3, s: 0.22, f: false, z: ++zc };
+          state.items.push(it); sel = it.id; A.play('place'); save(); render();
+        });
+        tray.appendChild(b);
+      });
+    }
+  }
+  CATS.forEach((c, i) => { const b = document.createElement('button'); b.textContent = c.i; b.addEventListener('click', () => { cat = i; A.play('tap'); buildTray(); }); cats.appendChild(b); });
+  document.getElementById('clear').addEventListener('click', () => {
+    if (!state.items.length || confirm('Alle stickers weghalen?')) { state.items = []; sel = null; save(); render(); }
+  });
+  addEventListener('resize', render);
+  buildTray(); render();
+  A.start({ emoji: '🦄', title: 'Stickers', hint: 'Maak je eigen plaatje met stickers!' });
+})();
+</script>
+</body>
+</html>
